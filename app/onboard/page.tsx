@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { VOICE_PROFILE_SCHEMA } from '@/lib/voiceSchema';
 
+type VoiceSource = 'twitter' | 'voiceMd' | 'samples';
+
 const NICHE_PRESETS = [
   'ai',
   'ai-agents',
@@ -17,28 +19,49 @@ const NICHE_PRESETS = [
 export default function OnboardPage() {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
+  const [progressLabel, setProgressLabel] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
-  // Form state
+  // Required quick-start fields
   const [name, setName] = useState('');
   const [websiteUrl, setWebsiteUrl] = useState('');
-  const [description, setDescription] = useState('');
-  const [doctrine, setDoctrine] = useState('');
-  const [recentPosts, setRecentPosts] = useState('');
 
-  // Voice triad
+  // Voice source picker
+  const [voiceSource, setVoiceSource] = useState<VoiceSource>('twitter');
+  const [twitterHandle, setTwitterHandle] = useState('');
   const [voiceMd, setVoiceMd] = useState('');
   const [samples, setSamples] = useState('');
-  const [twitterHandle, setTwitterHandle] = useState('');
 
-  // Niche
+  // Optional polish (in accordion)
+  const [doctrine, setDoctrine] = useState('');
+  const [recentPosts, setRecentPosts] = useState('');
   const [niche, setNiche] = useState('ai-agents');
   const [keywords, setKeywords] = useState('');
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    // Validate voice source has content
+    const hasVoice =
+      (voiceSource === 'twitter' && twitterHandle.trim()) ||
+      (voiceSource === 'voiceMd' && voiceMd.trim().length > 100) ||
+      (voiceSource === 'samples' && samples.trim().length > 50);
+
+    if (!hasVoice) {
+      setError(
+        voiceSource === 'twitter'
+          ? 'Please enter a Twitter handle.'
+          : voiceSource === 'voiceMd'
+            ? 'Please paste a voice.md (minimum 100 chars).'
+            : 'Please paste at least one writing sample.',
+      );
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
+    setProgressLabel('Creating project context (scraping site)…');
 
     const samplesArr = samples
       .split(/\n---+\n/)
@@ -56,269 +79,289 @@ export default function OnboardPage() {
       .filter(Boolean);
 
     try {
+      // Switch progress label after ~10s to feel responsive
+      const progressTimer = setTimeout(() => {
+        setProgressLabel(
+          voiceSource === 'twitter'
+            ? 'Analyzing Twitter voice (this can take ~90s)…'
+            : 'Extracting voice profile…',
+        );
+      }, 10_000);
+
       const res = await fetch('/api/onboard', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           name,
           websiteUrl,
-          description,
-          doctrine,
-          recentPosts: recentPostsArr,
           voice: {
-            voiceMd: voiceMd.trim() || undefined,
-            samples: samplesArr.length ? samplesArr : undefined,
-            twitterHandle: twitterHandle.trim() || undefined,
+            voiceMd: voiceSource === 'voiceMd' ? voiceMd : undefined,
+            samples: voiceSource === 'samples' ? samplesArr : undefined,
+            twitterHandle: voiceSource === 'twitter' ? twitterHandle : undefined,
           },
-          niche,
+          // Optional polish (sent only if user filled them)
+          doctrine: doctrine.trim() || undefined,
+          recentPosts: recentPostsArr.length ? recentPostsArr : undefined,
+          niche: showAdvanced ? niche : undefined,
           keywords: keywordsArr.length ? keywordsArr : undefined,
         }),
       });
+
+      clearTimeout(progressTimer);
 
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.message ?? data.error ?? 'Onboarding failed');
       }
 
-      router.push(`/generate?founderId=${data.founder.id}`);
+      // Send to profile page where the user can confirm/polish.
+      router.push(`/founder/${data.founder.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
       setSubmitting(false);
+      setProgressLabel(null);
     }
   }
 
   function downloadTemplate() {
-    const blob = new Blob([VOICE_PROFILE_SCHEMA.replace('{{founder_name}}', name || '[Name]')], {
-      type: 'text/markdown',
-    });
+    const blob = new Blob(
+      [VOICE_PROFILE_SCHEMA.replace('{{founder_name}}', name || '[Name]')],
+      { type: 'text/markdown' },
+    );
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `voice-profile-template.md`;
+    a.download = 'voice-profile-template.md';
     a.click();
     URL.revokeObjectURL(url);
   }
 
   return (
     <main className="min-h-screen bg-neutral-950 text-neutral-100">
-      <div className="mx-auto max-w-3xl px-6 py-12">
-        <header className="mb-8">
+      <div className="mx-auto max-w-2xl px-6 py-12">
+        <header className="mb-10">
           <a href="/" className="text-sm text-neutral-400 hover:text-neutral-200">
             ← Home
           </a>
-          <h1 className="mt-2 text-3xl font-bold">Onboard founder</h1>
+          <h1 className="mt-3 text-3xl font-bold">Onboard founder</h1>
           <p className="mt-2 text-neutral-400">
-            We'll create a Hivemind project from the website, build a voice profile from your inputs,
-            and set up the conversation thread the generation pipeline reuses.
+            Three inputs. We figure out the rest from your site and your voice.
           </p>
         </header>
 
-        <form onSubmit={onSubmit} className="space-y-8">
-          <Section title="Founder identity">
-            <Field label="Name" required>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Gonçalo / Salo"
-                required
-                className="input"
-              />
-            </Field>
-            <Field label="Website URL" required>
-              <input
-                type="url"
-                value={websiteUrl}
-                onChange={(e) => setWebsiteUrl(e.target.value)}
-                placeholder="https://myosin.xyz"
-                required
-                className="input"
-              />
-              <p className="hint">Hivemind will scrape this and build project context automatically.</p>
-            </Field>
-            <Field label="Description (optional)">
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="What they're building, in their own words. Supplements the website scrape."
-                rows={3}
-                className="input"
-              />
-            </Field>
-          </Section>
+        <form onSubmit={onSubmit} className="space-y-6">
+          {/* Name */}
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-neutral-300">
+              Name <span className="text-red-400">*</span>
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Gonçalo / Salo"
+              required
+              className="w-full rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100"
+            />
+          </div>
 
-          <Section title="Doctrine">
-            <Field label="Named principles" required>
-              <textarea
-                value={doctrine}
-                onChange={(e) => setDoctrine(e.target.value)}
-                placeholder="Your 3-7 core POVs about your domain. The doctrine the content should be grounded in."
-                rows={6}
-                required
-                className="input"
-              />
-            </Field>
-          </Section>
+          {/* Website URL */}
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-neutral-300">
+              Website URL <span className="text-red-400">*</span>
+            </label>
+            <input
+              type="url"
+              value={websiteUrl}
+              onChange={(e) => setWebsiteUrl(e.target.value)}
+              placeholder="https://myosin.xyz"
+              required
+              className="w-full rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100"
+            />
+            <p className="mt-1 text-xs text-neutral-500">
+              We'll scrape this — extracts description, audiences, social handles.
+            </p>
+          </div>
 
-          <Section title="Recent content (for gap analysis)">
-            <Field label="5 most recent pillar posts">
-              <textarea
-                value={recentPosts}
-                onChange={(e) => setRecentPosts(e.target.value)}
-                placeholder="Paste up to 5 of your most recent pillar posts. Separate each with --- on its own line."
-                rows={10}
-                className="input font-mono text-sm"
-              />
-              <p className="hint">Used by the gap analysis to identify where you're narratively absent.</p>
-            </Field>
-          </Section>
-
-          <Section title="Voice (provide at least one source)">
-            <div className="mb-3 flex items-center justify-between">
-              <p className="text-sm text-neutral-400">
-                Stack as many sources as you have. Voice.md takes precedence; others stack as inputs.
-              </p>
-              <button
-                type="button"
-                onClick={downloadTemplate}
-                className="text-xs text-blue-400 hover:underline"
-              >
-                Download voice.md template
-              </button>
+          {/* Voice source picker */}
+          <div>
+            <div className="mb-1.5 flex items-center justify-between">
+              <label className="block text-sm font-medium text-neutral-300">
+                Voice source <span className="text-red-400">*</span>
+              </label>
+              {voiceSource === 'voiceMd' && (
+                <button
+                  type="button"
+                  onClick={downloadTemplate}
+                  className="text-xs text-blue-400 hover:underline"
+                >
+                  Download template
+                </button>
+              )}
             </div>
 
-            <Field label="Voice.md (upload or paste)">
-              <textarea
-                value={voiceMd}
-                onChange={(e) => setVoiceMd(e.target.value)}
-                placeholder="Paste a filled-out voice.md here. Uses the template format. Canonical."
-                rows={8}
-                className="input font-mono text-sm"
-              />
-            </Field>
+            {/* Tab strip */}
+            <div className="mb-3 flex gap-1 rounded-md border border-neutral-800 bg-neutral-900 p-1">
+              {(
+                [
+                  { id: 'twitter', label: 'Twitter / X', hint: 'fastest' },
+                  { id: 'voiceMd', label: 'Voice.md upload', hint: 'highest fidelity' },
+                  { id: 'samples', label: 'Paste samples', hint: 'flexible' },
+                ] as { id: VoiceSource; label: string; hint: string }[]
+              ).map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setVoiceSource(opt.id)}
+                  className={`flex-1 rounded px-3 py-2 text-sm transition-colors ${
+                    voiceSource === opt.id
+                      ? 'bg-white text-black'
+                      : 'text-neutral-400 hover:text-neutral-200'
+                  }`}
+                >
+                  <div>{opt.label}</div>
+                  <div className="text-xs opacity-60">{opt.hint}</div>
+                </button>
+              ))}
+            </div>
 
-            <Field label="Long-form samples (5-10 pieces)">
-              <textarea
-                value={samples}
-                onChange={(e) => setSamples(e.target.value)}
-                placeholder="Paste 5-10 of your best long-form pieces. Separate each with --- on its own line. Extracted to voice.md format."
-                rows={10}
-                className="input font-mono text-sm"
-              />
-            </Field>
-
-            <Field label="Twitter handle (optional)">
+            {/* Source-specific input */}
+            {voiceSource === 'twitter' && (
               <input
                 type="text"
                 value={twitterHandle}
                 onChange={(e) => setTwitterHandle(e.target.value)}
                 placeholder="@0xSalo"
-                className="input"
+                className="w-full rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100"
               />
-              <p className="hint">If Beacon is configured, runs voice/analyze for short-form stylometry.</p>
-            </Field>
-          </Section>
-
-          <Section title="Niche (for trend signal + pattern collection)">
-            <Field label="Niche">
-              <select
-                value={niche}
-                onChange={(e) => setNiche(e.target.value)}
-                className="input"
-              >
-                {NICHE_PRESETS.map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
-              <p className="hint">Pre-scanned niches: instant signal access during generation.</p>
-            </Field>
-            <Field label="Keywords (for Beacon pattern collection)">
-              <input
-                type="text"
-                value={keywords}
-                onChange={(e) => setKeywords(e.target.value)}
-                placeholder="ai agents, llm tools, agent workflows"
-                className="input"
+            )}
+            {voiceSource === 'voiceMd' && (
+              <textarea
+                value={voiceMd}
+                onChange={(e) => setVoiceMd(e.target.value)}
+                placeholder="Paste a filled-out voice.md here. Canonical — used directly as the style guide."
+                rows={8}
+                className="w-full rounded-md border border-neutral-800 bg-neutral-900 p-3 text-sm font-mono text-neutral-200"
               />
-              <p className="hint">Comma-separated. Used to refresh niche patterns if Beacon is configured.</p>
-            </Field>
-          </Section>
+            )}
+            {voiceSource === 'samples' && (
+              <textarea
+                value={samples}
+                onChange={(e) => setSamples(e.target.value)}
+                placeholder="Paste 3-10 of your best long-form pieces. Separate each with --- on its own line."
+                rows={10}
+                className="w-full rounded-md border border-neutral-800 bg-neutral-900 p-3 text-sm font-mono text-neutral-200"
+              />
+            )}
+          </div>
 
+          {/* Error */}
           {error && (
             <div className="rounded-md border border-red-900 bg-red-950/50 px-4 py-3 text-sm text-red-300">
               {error}
             </div>
           )}
 
-          <div className="flex gap-3">
+          {/* Submit */}
+          <div>
             <button
               type="submit"
               disabled={submitting}
-              className="rounded-md bg-white px-6 py-3 font-medium text-black hover:bg-neutral-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full rounded-md bg-white px-6 py-3 font-medium text-black hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {submitting ? 'Onboarding…' : 'Onboard founder'}
+              {submitting ? progressLabel ?? 'Setting up…' : '⚡ Start'}
             </button>
-            <a
-              href="/"
-              className="rounded-md border border-neutral-700 px-6 py-3 hover:bg-neutral-800"
+            {submitting && (
+              <p className="mt-2 text-center text-xs text-neutral-500">
+                Hivemind enrichment + voice extraction. Usually 30-90s.
+              </p>
+            )}
+          </div>
+
+          {/* Optional polish — accordion */}
+          <div className="border-t border-neutral-800 pt-6">
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="flex w-full items-center justify-between text-sm text-neutral-400 hover:text-neutral-200"
             >
-              Cancel
-            </a>
+              <span>Optional polish — can add later from the profile page</span>
+              <span>{showAdvanced ? '▲' : '▼'}</span>
+            </button>
+
+            {showAdvanced && (
+              <div className="mt-6 space-y-5">
+                <Field
+                  label="Doctrine"
+                  hint="3-7 named POVs the content should be grounded in. Optional now — can edit later."
+                >
+                  <textarea
+                    value={doctrine}
+                    onChange={(e) => setDoctrine(e.target.value)}
+                    rows={5}
+                    className="w-full rounded-md border border-neutral-800 bg-neutral-900 p-3 text-sm text-neutral-100"
+                  />
+                </Field>
+
+                <Field
+                  label="Recent pillar posts"
+                  hint="3-5 recent posts for gap analysis. Separate with ---. Optional — degrades gracefully."
+                >
+                  <textarea
+                    value={recentPosts}
+                    onChange={(e) => setRecentPosts(e.target.value)}
+                    rows={6}
+                    placeholder="Post 1...&#10;---&#10;Post 2..."
+                    className="w-full rounded-md border border-neutral-800 bg-neutral-900 p-3 text-sm font-mono text-neutral-200"
+                  />
+                </Field>
+
+                <Field label="Niche">
+                  <select
+                    value={niche}
+                    onChange={(e) => setNiche(e.target.value)}
+                    className="w-full rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100"
+                  >
+                    {NICHE_PRESETS.map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Keywords" hint="Comma-separated. Used for Beacon pattern collection.">
+                  <input
+                    type="text"
+                    value={keywords}
+                    onChange={(e) => setKeywords(e.target.value)}
+                    placeholder="ai agents, llm tools, agent workflows"
+                    className="w-full rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100"
+                  />
+                </Field>
+              </div>
+            )}
           </div>
         </form>
       </div>
-
-      <style>{`
-        .input {
-          width: 100%;
-          background: rgb(23 23 23);
-          border: 1px solid rgb(64 64 64);
-          border-radius: 6px;
-          padding: 8px 12px;
-          color: rgb(229 229 229);
-          font-size: 14px;
-        }
-        .input:focus {
-          outline: none;
-          border-color: rgb(115 115 115);
-        }
-        .hint {
-          font-size: 12px;
-          color: rgb(115 115 115);
-          margin-top: 4px;
-        }
-      `}</style>
     </main>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section>
-      <h2 className="mb-4 text-xl font-semibold">{title}</h2>
-      <div className="space-y-4">{children}</div>
-    </section>
   );
 }
 
 function Field({
   label,
-  required,
+  hint,
   children,
 }: {
   label: string;
-  required?: boolean;
+  hint?: string;
   children: React.ReactNode;
 }) {
   return (
     <div>
-      <label className="mb-1.5 block text-sm font-medium text-neutral-300">
-        {label}
-        {required && <span className="ml-1 text-red-400">*</span>}
-      </label>
+      <label className="mb-1.5 block text-sm font-medium text-neutral-300">{label}</label>
       {children}
+      {hint && <p className="mt-1 text-xs text-neutral-500">{hint}</p>}
     </div>
   );
 }

@@ -4,15 +4,17 @@ import { createFounder } from '@/lib/store';
 import type { VoiceInput } from '@/lib/types';
 
 export const runtime = 'nodejs';
-export const maxDuration = 120; // Hivemind enrichment can take 30-60s + voice extraction ~10-15s
+export const maxDuration = 120; // Hivemind enrichment + voice extraction can take 60-90s
 
 type OnboardRequestBody = {
   name: string;
   websiteUrl: string;
   description?: string;
-  doctrine: string;
-  recentPosts: string[];      // 5 recent pillar posts (for gap analysis)
-  voice: VoiceInput;          // voiceMd, samples, or twitterHandle
+  voice: VoiceInput;            // voiceMd, samples, or twitterHandle
+
+  // Optional — can be added later via PATCH /api/founders/[id]
+  doctrine?: string;
+  recentPosts?: string[];
   niche?: string;
   keywords?: string[];
 };
@@ -26,17 +28,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'invalid_json' }, { status: 400 });
   }
 
-  // Minimal validation. UI does most of it.
-  if (!body.name || !body.websiteUrl || !body.doctrine) {
+  // Minimum: name + websiteUrl + one voice source.
+  if (!body.name || !body.websiteUrl) {
     return NextResponse.json(
-      { error: 'missing_fields', message: 'name, websiteUrl, and doctrine are required' },
+      { error: 'missing_fields', message: 'name and websiteUrl are required' },
       { status: 400 },
     );
   }
 
-  if (!body.voice.voiceMd && !body.voice.samples?.length && !body.voice.twitterHandle) {
+  if (!body.voice?.voiceMd && !body.voice?.samples?.length && !body.voice?.twitterHandle) {
     return NextResponse.json(
-      { error: 'missing_voice', message: 'Provide voiceMd, samples, or twitterHandle' },
+      { error: 'missing_voice', message: 'Provide one of: voice.md, samples, or Twitter handle' },
       { status: 400 },
     );
   }
@@ -55,12 +57,13 @@ export async function POST(req: NextRequest) {
       name: body.name,
       websiteUrl: body.websiteUrl,
       description: body.description,
-      doctrine: body.doctrine,
+      doctrine: body.doctrine ?? '',
       recentPosts: body.recentPosts ?? [],
       voiceInput: body.voice,
       hivemindProjectId: onboarded.hivemindProjectId,
       conversationId: onboarded.conversationId,
       styleGuide: onboarded.styleGuide,
+      enriched: onboarded.enriched,
       niche: body.niche,
       keywords: body.keywords,
     });
@@ -69,8 +72,10 @@ export async function POST(req: NextRequest) {
       founder: {
         id: founder.id,
         name: founder.name,
+        websiteUrl: founder.websiteUrl,
         hivemindProjectId: founder.hivemindProjectId,
         styleGuide: founder.styleGuide,
+        enriched: founder.enriched,
       },
     });
   } catch (err) {

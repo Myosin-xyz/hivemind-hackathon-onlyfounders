@@ -10,6 +10,7 @@ import type {
   PipelineStep,
   GenerationRequest,
   BeaconNichePattern,
+  EnrichedFields,
 } from './types';
 
 export type PipelineCallbacks = {
@@ -56,9 +57,11 @@ export async function runOnboarding(
   hivemindProjectId: string;
   conversationId: string;
   styleGuide: string;
+  enriched: EnrichedFields;
 }> {
   // Step 1: create Hivemind project (triggers automatic enrichment + polls until ready).
   let projectId = '';
+  let enriched: EnrichedFields = {};
   await runStep('project_create', callbacks, async () => {
     const project = await hivemind.createAndEnrich({
       project_name: input.name,
@@ -67,6 +70,11 @@ export async function runOnboarding(
       stage: 'growth',
     });
     projectId = project.id;
+    enriched = {
+      description: project.description,
+      audiences: project.audiences,
+      stage: project.stage,
+    };
     return `Project ${project.id} enriched (status: ${project.enrichment_status})`;
   });
 
@@ -110,6 +118,7 @@ export async function runOnboarding(
     hivemindProjectId: projectId,
     conversationId: conversation.conversation_id ?? '',
     styleGuide,
+    enriched,
   };
 }
 

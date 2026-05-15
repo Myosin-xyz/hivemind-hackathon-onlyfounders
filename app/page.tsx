@@ -53,6 +53,12 @@ export default function Home() {
                   </div>
                   <div className="flex gap-2">
                     <Link
+                      href={`/founder/${f.id}`}
+                      className="rounded-md border border-neutral-700 px-3 py-1.5 text-sm hover:bg-neutral-800"
+                    >
+                      Profile
+                    </Link>
+                    <Link
                       href={`/generate?founderId=${f.id}`}
                       className="rounded-md border border-neutral-700 px-3 py-1.5 text-sm hover:bg-neutral-800"
                     >

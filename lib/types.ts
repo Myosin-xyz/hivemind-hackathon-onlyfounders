@@ -5,24 +5,33 @@ export type VoiceInput = {
   twitterHandle?: string;    // Beacon voice/analyze (if deployed)
 };
 
+// What Hivemind's enrichment pipeline returns after scraping the website
+export type EnrichedFields = {
+  description?: string;            // Hivemind's extracted description (may differ from user-provided)
+  audiences?: string[];
+  socialHandles?: Record<string, string>;
+  stage?: string;
+};
+
 // Founder profile — full state across onboarding + generation
 export type FounderProfile = {
   id: string;
   name: string;
   websiteUrl: string;
-  description?: string;
-  doctrine: string;
-  recentPosts: string[];     // 5 recent pillar posts for gap analysis
+  description?: string;            // user-provided
+  doctrine: string;                // optional — can be empty initially
+  recentPosts: string[];           // optional — pipeline degrades gracefully
   voiceInput: VoiceInput;
 
   // Resolved after onboarding
   hivemindProjectId?: string;
   conversationId?: string;
-  styleGuide?: string;       // voice.md (uploaded or extracted)
+  styleGuide?: string;             // voice.md (uploaded or extracted)
+  enriched?: EnrichedFields;       // what Hivemind figured out
 
   // Niche config (for Beacon patterns)
-  niche?: string;            // e.g. 'ai-agents'
-  keywords?: string[];       // keywords for patterns collection
+  niche?: string;
+  keywords?: string[];
 };
 
 // ─── Hivemind API ───────────────────────────────────────────
