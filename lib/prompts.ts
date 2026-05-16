@@ -227,6 +227,26 @@ Output the post directly. No preamble. No meta-commentary. Just the post.`;
 
 // ─── QC (uses draft via conversationId) ────────────────────
 
+// ─── Revise pillar based on QC feedback ────────────────────
+
+// Takes the QC feedback (already in the conversation thread) and produces a
+// REVISED pillar that addresses the actionable fixes. The revised pillar
+// becomes the canonical source for the repurpose stage.
+export function revisePillarPrompt(): string {
+  return `The QC step just produced feedback on the draft pillar (above in our conversation). Produce a REVISED version of the pillar that addresses every actionable fix.
+
+Rules:
+- Apply every specific fix from the QC's "Specific Fixes Required" section
+- Preserve everything the QC marked PASS — don't fix what isn't broken
+- Keep the voice consistent with the voice profile loaded in this conversation
+- Keep the length comparable to the original (600-900 words)
+- Maintain the chosen angle and doctrine connection
+
+If the QC verdict was READY TO SHIP, output the original pillar unchanged.
+
+Output ONLY the revised pillar text. No preamble. No QC commentary. No section headers like "REVISED PILLAR:". Just the prose, ready to ship.`;
+}
+
 export function qcPrompt(): string {
   return `Apply a 7-lens quality check to the draft just produced. Flag specific lines or passages that fail any lens. Suggest concrete fixes.
 
@@ -257,7 +277,7 @@ Output as markdown:
 // ─── Repurpose (each uses pillar via conversationId) ───────
 
 export function repurposeXThreadPrompt(): string {
-  return `Repurpose the pillar post into an X thread.
+  return `Repurpose the FINAL pillar (the revised version produced after QC, above in our conversation) into an X thread.
 
 CONSTRAINTS:
 - 6-10 tweets
@@ -277,7 +297,7 @@ No preamble. Thread only.`;
 }
 
 export function repurposeBlogPrompt(): string {
-  return `Repurpose the pillar post into a long-form blog article.
+  return `Repurpose the FINAL pillar (the revised version produced after QC, above in our conversation) into a long-form blog article.
 
 CONSTRAINTS:
 - 1200-1800 words (longer, deeper than the LinkedIn pillar)
@@ -291,7 +311,7 @@ Output as markdown with H2 headers. No preamble.`;
 }
 
 export function repurposeNewsletterPrompt(): string {
-  return `Repurpose the pillar post into a personal newsletter edition.
+  return `Repurpose the FINAL pillar (the revised version produced after QC, above in our conversation) into a personal newsletter edition.
 
 CONSTRAINTS:
 - 400-600 words (shorter than the pillar; tighter)
@@ -305,7 +325,7 @@ Output as markdown. No preamble.`;
 }
 
 export function repurposeVideoScriptPrompt(): string {
-  return `Repurpose the pillar post into a short-form video script (60-90 seconds).
+  return `Repurpose the FINAL pillar (the revised version produced after QC, above in our conversation) into a short-form video script (60-90 seconds).
 
 CONSTRAINTS:
 - Spoken voice — write to be read aloud, not silently read

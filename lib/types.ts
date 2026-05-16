@@ -116,6 +116,7 @@ export type PipelineStep =
   | 'brief'
   | 'draft_pillar'
   | 'qc'
+  | 'revised_pillar'
   | 'repurpose_x_thread'
   | 'repurpose_blog'
   | 'repurpose_newsletter'

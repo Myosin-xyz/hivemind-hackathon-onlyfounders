@@ -13,11 +13,21 @@ const STEP_LABELS: Record<PipelineStep, string> = {
   brief: 'Brief',
   draft_pillar: 'Draft pillar',
   qc: 'QC + anti-AI-slop',
+  revised_pillar: 'Revised pillar',
   repurpose_x_thread: 'X thread',
   repurpose_blog: 'Blog / long-form',
   repurpose_newsletter: 'Newsletter',
   repurpose_video_script: 'Video script',
 };
+
+// Steps whose output is prose meant for human reading — renders with
+// paragraph spacing + readable typography instead of monospace pre.
+const PROSE_STEPS: PipelineStep[] = [
+  'draft_pillar',
+  'revised_pillar',
+  'repurpose_blog',
+  'repurpose_newsletter',
+];
 
 const GENERATION_STEPS: PipelineStep[] = [
   'niche_patterns',
@@ -81,6 +91,7 @@ const DRAFT_STEPS: PipelineStep[] = [
   'brief',
   'draft_pillar',
   'qc',
+  'revised_pillar',
 ];
 
 const VARIATION_STEPS: PipelineStep[] = [
@@ -363,8 +374,13 @@ function GeneratePageInner() {
     } else if (event.type === 'step_completed') {
       setStepStates((s) => ({ ...s, [event.step]: 'completed' }));
       setStepOutputs((s) => ({ ...s, [event.step]: event.output }));
-      // Auto-focus the latest completed step in the viewer
-      if (event.step === 'draft_pillar' || event.step.startsWith('repurpose_')) {
+      // Auto-focus the latest completed step in the viewer.
+      // Once revised_pillar lands, it supersedes draft_pillar as the "final" pillar.
+      if (
+        event.step === 'draft_pillar' ||
+        event.step === 'revised_pillar' ||
+        event.step.startsWith('repurpose_')
+      ) {
         setActiveTab(event.step);
       }
     } else if (event.type === 'step_failed') {
@@ -386,9 +402,14 @@ function GeneratePageInner() {
   const draftStepsTriggered = draftRunning || draftComplete;
   const variationStepsTriggered = variationsRunning || variationsComplete;
 
-  const draftStepsForList = angleSelected
-    ? DRAFT_STEPS.filter((s) => s !== 'gap_analysis')
-    : DRAFT_STEPS;
+  const draftStepsForList = (() => {
+    let steps = angleSelected
+      ? DRAFT_STEPS.filter((s) => s !== 'gap_analysis')
+      : DRAFT_STEPS;
+    // niche_patterns is optional — hide if it didn't actually run
+    steps = steps.filter((s) => s !== 'niche_patterns' || !!stepOutputs['niche_patterns']);
+    return steps;
+  })();
 
   // Show pipeline steps only for stages the user has actually kicked off
   const visiblePipelineSteps: PipelineStep[] = [
@@ -751,11 +772,13 @@ function GeneratePageInner() {
               />
             ) : (
               <>
+                {/* Angle context — always at top */}
                 <div className="rounded-md border border-neutral-800 bg-neutral-900 p-3 text-xs">
                   <span className="mr-2 text-neutral-500">Angle:</span>
                   <span className="text-neutral-200">{selectedAngle || customAngle}</span>
                 </div>
 
+                {/* Not started: prominent CTA */}
                 {!draftComplete && !draftRunning && (
                   <button
                     type="button"
@@ -765,12 +788,40 @@ function GeneratePageInner() {
                     Generate draft
                   </button>
                 )}
+
+                {/* Output viewer — main content area when something's happening */}
+                {(draftRunning || draftComplete) && (
+                  <OutputViewer
+                    tabs={draftStepsForList}
+                    stepOutputs={stepOutputs}
+                    activeTab={activeTab}
+                    setActiveTab={setActiveTab}
+                    running={draftRunning}
+                    emptyMessage={
+                      draftRunning
+                        ? 'Pipeline running… outputs stream in as each step completes.'
+                        : 'Click a tab above to view that step\'s output.'
+                    }
+                  />
+                )}
+
+                {/* Pipeline progress — supplementary, below output */}
+                {(draftRunning || draftComplete) && (
+                  <PipelineList
+                    steps={draftStepsForList}
+                    stepStates={stepStates}
+                    stepOutputs={stepOutputs}
+                    setActiveTab={setActiveTab}
+                  />
+                )}
+
+                {/* Actions at bottom — after the user has read */}
                 {draftRunning && (
                   <button
                     disabled
                     className="w-full rounded-md bg-neutral-700 px-6 py-3 font-medium text-neutral-300"
                   >
-                    Generating draft… (~1-2 min)
+                    Generating draft… (~2-3 min)
                   </button>
                 )}
                 {draftComplete && !draftRunning && (
@@ -791,32 +842,6 @@ function GeneratePageInner() {
                     </button>
                   </div>
                 )}
-
-                {(draftRunning || draftComplete) && (
-                  <PipelineList
-                    steps={draftStepsForList}
-                    stepStates={stepStates}
-                    stepOutputs={stepOutputs}
-                    setActiveTab={setActiveTab}
-                  />
-                )}
-
-                {(draftRunning || draftComplete) && (
-                  <OutputViewer
-                    tabs={draftStepsForList}
-                    stepOutputs={stepOutputs}
-                    activeTab={activeTab}
-                    setActiveTab={setActiveTab}
-                    running={draftRunning}
-                    emptyMessage={
-                      draftRunning
-                        ? 'Pipeline running… outputs stream in as each step completes.'
-                        : draftComplete
-                        ? 'Click a tab above to view that step\'s output.'
-                        : 'Click "Generate draft" to start.'
-                    }
-                  />
-                )}
               </>
             )}
           </div>
@@ -833,6 +858,7 @@ function GeneratePageInner() {
               />
             ) : (
               <>
+                {/* Not started: prominent CTA */}
                 {!variationsComplete && !variationsRunning && (
                   <button
                     type="button"
@@ -842,6 +868,34 @@ function GeneratePageInner() {
                     Generate variations
                   </button>
                 )}
+
+                {/* Output viewer (the variations themselves) */}
+                {(variationsRunning || variationsComplete) && (
+                  <OutputViewer
+                    tabs={VARIATION_STEPS}
+                    stepOutputs={stepOutputs}
+                    activeTab={activeTab}
+                    setActiveTab={setActiveTab}
+                    running={variationsRunning}
+                    emptyMessage={
+                      variationsRunning
+                        ? 'Generating each variation in sequence…'
+                        : 'Click a tab above to view that variation.'
+                    }
+                  />
+                )}
+
+                {/* Pipeline progress */}
+                {(variationsRunning || variationsComplete) && (
+                  <PipelineList
+                    steps={VARIATION_STEPS}
+                    stepStates={stepStates}
+                    stepOutputs={stepOutputs}
+                    setActiveTab={setActiveTab}
+                  />
+                )}
+
+                {/* Actions at bottom */}
                 {variationsRunning && (
                   <button
                     disabled
@@ -853,7 +907,7 @@ function GeneratePageInner() {
                 {variationsComplete && !variationsRunning && (
                   <div className="space-y-2">
                     <div className="rounded-md border border-green-900/50 bg-green-950/20 px-4 py-3 text-sm text-green-300">
-                      ✓ All 4 variations ready. Click a tab below to view.
+                      ✓ All 4 variations ready.
                     </div>
                     <button
                       type="button"
@@ -863,32 +917,6 @@ function GeneratePageInner() {
                       ↻ Regenerate variations
                     </button>
                   </div>
-                )}
-
-                {(variationsRunning || variationsComplete) && (
-                  <PipelineList
-                    steps={VARIATION_STEPS}
-                    stepStates={stepStates}
-                    stepOutputs={stepOutputs}
-                    setActiveTab={setActiveTab}
-                  />
-                )}
-
-                {(variationsRunning || variationsComplete) && (
-                  <OutputViewer
-                    tabs={VARIATION_STEPS}
-                    stepOutputs={stepOutputs}
-                    activeTab={activeTab}
-                    setActiveTab={setActiveTab}
-                    running={variationsRunning}
-                    emptyMessage={
-                      variationsRunning
-                        ? 'Generating each variation in sequence…'
-                        : variationsComplete
-                        ? 'Click a tab above to view that variation.'
-                        : 'Click "Generate variations" to start.'
-                    }
-                  />
                 )}
               </>
             )}
@@ -1006,11 +1034,24 @@ function OutputViewer({
           </button>
         ))}
       </div>
-      <div className="max-h-[70vh] overflow-y-auto rounded-lg border border-neutral-800 bg-neutral-900 p-4">
+      <div className="max-h-[70vh] overflow-y-auto rounded-lg border border-neutral-800 bg-neutral-900 p-6">
         {isActiveTabRelevant ? (
-          <pre className="whitespace-pre-wrap font-mono text-sm text-neutral-200">
-            {stepOutputs[activeTab]}
-          </pre>
+          PROSE_STEPS.includes(activeTab) ? (
+            <div className="max-w-prose space-y-4 text-[15px] leading-relaxed text-neutral-100">
+              {stepOutputs[activeTab]
+                .split(/\n\n+/)
+                .filter((p) => p.trim().length > 0)
+                .map((p, i) => (
+                  <p key={i} className="whitespace-pre-wrap">
+                    {p}
+                  </p>
+                ))}
+            </div>
+          ) : (
+            <pre className="whitespace-pre-wrap font-mono text-sm text-neutral-200">
+              {stepOutputs[activeTab]}
+            </pre>
+          )
         ) : (
           <div className="py-12 text-center text-sm text-neutral-500">
             {running ? 'Waiting for this step…' : emptyMessage}

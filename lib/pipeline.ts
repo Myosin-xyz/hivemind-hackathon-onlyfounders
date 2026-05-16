@@ -214,6 +214,18 @@ export async function runDraftStage(
     return res.response;
   });
 
+  // Step: revised pillar — applies QC fixes to produce the final version.
+  // The variations stage repurposes from this revised version, not the
+  // original draft.
+  results.revised_pillar = await runStep('revised_pillar', callbacks, async () => {
+    const res = await hivemind.appendToConversation(
+      founder.conversationId!,
+      prompts.revisePillarPrompt(),
+      'ghostwriter',
+    );
+    return res.response;
+  });
+
   await emit(callbacks, { type: 'pipeline_completed', results });
   return results;
 }
