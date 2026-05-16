@@ -122,16 +122,29 @@ export async function runOnboarding(
   };
 }
 
-// ─── Generation pipeline ───────────────────────────────────
+// ─── Generation pipeline — split into two stages ──────────
+// Stage 1: runDraftStage — niche patterns (optional) + (optional) gap analysis
+//                          + brief + draft pillar + QC. User reviews before
+//                          committing to the full repurpose cost.
+// Stage 2: runVariationsStage — the 4 channel-specific repurposes only.
+//                               Assumes the draft + QC are in the conversation
+//                               thread (they are, after stage 1).
+//
+// Both stages append to the same conversationId, so memory flows naturally
+// from one to the next.
 
-export async function runGeneration(
+function assertFounderReady(founder: FounderProfile): void {
+  if (!founder.hivemindProjectId || !founder.conversationId || !founder.styleGuide) {
+    throw new Error('Founder is not fully onboarded — missing projectId, conversationId, or styleGuide');
+  }
+}
+
+export async function runDraftStage(
   founder: FounderProfile,
   request: GenerationRequest,
   callbacks?: PipelineCallbacks,
 ): Promise<Partial<Record<PipelineStep, string>>> {
-  if (!founder.hivemindProjectId || !founder.conversationId || !founder.styleGuide) {
-    throw new Error('Founder is not fully onboarded — missing projectId, conversationId, or styleGuide');
-  }
+  assertFounderReady(founder);
 
   const results: Partial<Record<PipelineStep, string>> = {};
 
@@ -201,9 +214,20 @@ export async function runGeneration(
     return res.response;
   });
 
-  // Steps: repurpose × 4 (parallel — same conversation but different prompts).
-  // Note: Hivemind chat appends to conversation history sequentially, so parallel
-  // calls to the same conversation could race. We run serially to be safe.
+  await emit(callbacks, { type: 'pipeline_completed', results });
+  return results;
+}
+
+export async function runVariationsStage(
+  founder: FounderProfile,
+  callbacks?: PipelineCallbacks,
+): Promise<Partial<Record<PipelineStep, string>>> {
+  assertFounderReady(founder);
+
+  const results: Partial<Record<PipelineStep, string>> = {};
+
+  // Run repurposes serially — Hivemind chat appends to conversation history,
+  // so parallel calls to the same conversation could race.
   const repurposeSteps: Array<{ step: PipelineStep; prompt: () => string }> = [
     { step: 'repurpose_x_thread', prompt: prompts.repurposeXThreadPrompt },
     { step: 'repurpose_blog', prompt: prompts.repurposeBlogPrompt },
@@ -224,4 +248,16 @@ export async function runGeneration(
 
   await emit(callbacks, { type: 'pipeline_completed', results });
   return results;
+}
+
+// Back-compat wrapper: runs both stages in sequence. Existing /api/generate
+// can call this for a single-shot run, but the UI now uses the staged routes.
+export async function runGeneration(
+  founder: FounderProfile,
+  request: GenerationRequest,
+  callbacks?: PipelineCallbacks,
+): Promise<Partial<Record<PipelineStep, string>>> {
+  const draft = await runDraftStage(founder, request, callbacks);
+  const variations = await runVariationsStage(founder, callbacks);
+  return { ...draft, ...variations };
 }

@@ -46,6 +46,49 @@ function countBySource(signals: { source: string }[]): Record<string, number> {
   }, {} as Record<string, number>);
 }
 
+// ─── Trends localStorage cache ─────────────────────────────
+// 1h TTL, keyed by founderId + topic. Refresh button always re-fetches.
+const TRENDS_CACHE_TTL_MS = 60 * 60 * 1000;
+function trendsCacheKey(founderId: string, topic: string): string {
+  return `only-founders:trends:${founderId}:${topic.trim().toLowerCase()}`;
+}
+function loadCachedTrends(founderId: string, topic: string): TrendBrief | null {
+  try {
+    if (typeof window === 'undefined') return null;
+    const raw = window.localStorage.getItem(trendsCacheKey(founderId, topic));
+    if (!raw) return null;
+    const cached = JSON.parse(raw) as { brief: TrendBrief; cachedAt: number };
+    if (Date.now() - cached.cachedAt > TRENDS_CACHE_TTL_MS) return null;
+    return cached.brief;
+  } catch {
+    return null;
+  }
+}
+function saveCachedTrends(founderId: string, topic: string, brief: TrendBrief): void {
+  try {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(
+      trendsCacheKey(founderId, topic),
+      JSON.stringify({ brief, cachedAt: Date.now() }),
+    );
+  } catch {}
+}
+
+const DRAFT_STEPS: PipelineStep[] = [
+  'niche_patterns',
+  'gap_analysis',
+  'brief',
+  'draft_pillar',
+  'qc',
+];
+
+const VARIATION_STEPS: PipelineStep[] = [
+  'repurpose_x_thread',
+  'repurpose_blog',
+  'repurpose_newsletter',
+  'repurpose_video_script',
+];
+
 function hookChipClass(hookStyle: string): string {
   switch (hookStyle) {
     case 'provocative':
@@ -75,7 +118,13 @@ function GeneratePageInner() {
 
   const [founder, setFounder] = useState<{ name: string; niche?: string } | null>(null);
   const [signalBrief, setSignalBrief] = useState('');
-  const [running, setRunning] = useState(false);
+
+  // Two-stage generation state
+  const [draftRunning, setDraftRunning] = useState(false);
+  const [draftComplete, setDraftComplete] = useState(false);
+  const [variationsRunning, setVariationsRunning] = useState(false);
+  const [variationsComplete, setVariationsComplete] = useState(false);
+  const running = draftRunning || variationsRunning;
 
   // Trends widget state
   const [trendsTopic, setTrendsTopic] = useState('');
@@ -106,7 +155,14 @@ function GeneratePageInner() {
           setFounder({ name: data.founder.name, niche: data.founder.niche });
           const initialTopic = data.founder.niche?.replace(/-/g, ' ') ?? 'ai marketing';
           setTrendsTopic(initialTopic);
-          void fetchTrends(initialTopic);
+          // Cache hit (under 1h old) = instant render, no API call
+          const cached = loadCachedTrends(founderId, initialTopic);
+          if (cached) {
+            setTrendBrief(cached);
+            setSignalBrief(cached.brief);
+          } else {
+            void fetchTrends(initialTopic);
+          }
         }
       })
       .catch(() => {});
@@ -117,11 +173,17 @@ function GeneratePageInner() {
     if (!t.trim()) return;
     setTrendsLoading(true);
     setTrendsError(null);
-    // Fresh trends invalidate prior angles
+    // Fresh trends invalidate everything downstream
     setAnglesData(null);
     setAnglesError(null);
     setSelectedAngle('');
     setCustomAngle('');
+    setDraftRunning(false);
+    setDraftComplete(false);
+    setVariationsRunning(false);
+    setVariationsComplete(false);
+    setStepStates({});
+    setStepOutputs({});
     try {
       const res = await fetch('/api/trends', {
         method: 'POST',
@@ -132,6 +194,7 @@ function GeneratePageInner() {
       if (!res.ok) throw new Error(data.message ?? 'Trends fetch failed');
       setTrendBrief(data.brief);
       setSignalBrief(data.brief.brief); // pre-populate the editable brief
+      saveCachedTrends(founderId, t, data.brief);
     } catch (err) {
       setTrendsError(err instanceof Error ? err.message : 'Fetch failed');
     } finally {
@@ -161,66 +224,121 @@ function GeneratePageInner() {
     }
   }
 
-  async function onGenerate() {
+  // Generic SSE stream consumer — used by both stage runs.
+  async function streamPipeline(
+    url: string,
+    body: object,
+    signal: AbortSignal,
+  ): Promise<void> {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+      signal,
+    });
+    if (!res.ok || !res.body) {
+      const errorBody = await res.json().catch(() => ({}));
+      throw new Error(errorBody.message ?? `Request failed with status ${res.status}`);
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const events = buffer.split('\n\n');
+      buffer = events.pop() ?? '';
+      for (const block of events) {
+        const line = block.split('\n').find((l) => l.startsWith('data: '));
+        if (!line) continue;
+        const payload = line.slice(6).trim();
+        if (!payload) continue;
+        try {
+          const event = JSON.parse(payload) as PipelineEvent | { type: 'error'; message: string };
+          handleEvent(event);
+        } catch (err) {
+          console.error('Failed to parse SSE payload', err);
+        }
+      }
+    }
+  }
+
+  async function onGenerateDraft(): Promise<void> {
     if (!founderId || !signalBrief.trim()) return;
     const angle = (selectedAngle || customAngle).trim();
     if (!angle) return;
 
-    setRunning(true);
+    setDraftRunning(true);
+    setDraftComplete(false);
+    // Regenerating draft also invalidates downstream variations
+    setVariationsRunning(false);
+    setVariationsComplete(false);
     setErrorMessage(null);
-    // When angle is pre-selected, the pipeline skips gap_analysis (already run
-    // during /api/angles). Mirror that in the visible step list.
-    const stepsForRun = GENERATION_STEPS.filter((s) => s !== 'gap_analysis');
-    setStepStates(Object.fromEntries(stepsForRun.map((s) => [s, 'pending'])));
-    setStepOutputs({});
+
+    const angleSelected = true; // we just enforced it above
+    const stepsForRun = angleSelected
+      ? DRAFT_STEPS.filter((s) => s !== 'gap_analysis')
+      : DRAFT_STEPS;
+    // Reset state for this stage's steps only — preserve any prior variation outputs
+    setStepStates((prev) => ({
+      ...prev,
+      ...Object.fromEntries(stepsForRun.map((s) => [s, 'pending' as StepState])),
+    }));
+    setStepOutputs((prev) => {
+      const next = { ...prev };
+      for (const s of stepsForRun) delete next[s];
+      return next;
+    });
 
     abortRef.current = new AbortController();
 
     try {
-      const res = await fetch('/api/generate', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ founderId, signalBrief, angle }),
-        signal: abortRef.current.signal,
-      });
-
-      if (!res.ok || !res.body) {
-        const errorBody = await res.json().catch(() => ({}));
-        throw new Error(errorBody.message ?? `Generate failed with status ${res.status}`);
-      }
-
-      // Parse SSE stream manually
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const events = buffer.split('\n\n');
-        buffer = events.pop() ?? '';
-
-        for (const block of events) {
-          const line = block.split('\n').find((l) => l.startsWith('data: '));
-          if (!line) continue;
-          const payload = line.slice(6).trim();
-          if (!payload) continue;
-
-          try {
-            const event = JSON.parse(payload) as PipelineEvent | { type: 'error'; message: string };
-            handleEvent(event);
-          } catch (err) {
-            console.error('Failed to parse SSE payload', err);
-          }
-        }
-      }
+      await streamPipeline(
+        '/api/generate/draft',
+        { founderId, signalBrief, angle },
+        abortRef.current.signal,
+      );
+      setDraftComplete(true);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setErrorMessage(message);
     } finally {
-      setRunning(false);
+      setDraftRunning(false);
+    }
+  }
+
+  async function onGenerateVariations(): Promise<void> {
+    if (!founderId || !draftComplete) return;
+
+    setVariationsRunning(true);
+    setVariationsComplete(false);
+    setErrorMessage(null);
+
+    setStepStates((prev) => ({
+      ...prev,
+      ...Object.fromEntries(VARIATION_STEPS.map((s) => [s, 'pending' as StepState])),
+    }));
+    setStepOutputs((prev) => {
+      const next = { ...prev };
+      for (const s of VARIATION_STEPS) delete next[s];
+      return next;
+    });
+
+    abortRef.current = new AbortController();
+
+    try {
+      await streamPipeline(
+        '/api/generate/variations',
+        { founderId },
+        abortRef.current.signal,
+      );
+      setVariationsComplete(true);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setErrorMessage(message);
+    } finally {
+      setVariationsRunning(false);
     }
   }
 
@@ -253,16 +371,24 @@ function GeneratePageInner() {
   }
 
   // Angle-driven flow skips gap_analysis (it ran in /api/angles instead).
-  // Reflect that in the pipeline list and output tabs.
   const angleSelected = !!(selectedAngle || customAngle.trim());
-  const visiblePipelineSteps = angleSelected
-    ? GENERATION_STEPS.filter((s) => s !== 'gap_analysis')
-    : GENERATION_STEPS;
-  const visibleOutputTabs: PipelineStep[] = (
-    angleSelected
-      ? ['brief', 'draft_pillar', 'qc', 'repurpose_x_thread', 'repurpose_blog', 'repurpose_newsletter', 'repurpose_video_script']
-      : ['gap_analysis', 'brief', 'draft_pillar', 'qc', 'repurpose_x_thread', 'repurpose_blog', 'repurpose_newsletter', 'repurpose_video_script']
-  );
+  const draftStepsTriggered = draftRunning || draftComplete;
+  const variationStepsTriggered = variationsRunning || variationsComplete;
+
+  const draftStepsForList = angleSelected
+    ? DRAFT_STEPS.filter((s) => s !== 'gap_analysis')
+    : DRAFT_STEPS;
+
+  // Show pipeline steps only for stages the user has actually kicked off
+  const visiblePipelineSteps: PipelineStep[] = [
+    ...(draftStepsTriggered ? draftStepsForList : []),
+    ...(variationStepsTriggered ? VARIATION_STEPS : []),
+  ];
+
+  const visibleOutputTabs: PipelineStep[] = [
+    ...(draftStepsTriggered ? draftStepsForList : []),
+    ...(variationStepsTriggered ? VARIATION_STEPS : []),
+  ];
 
   return (
     <main className="min-h-screen bg-neutral-950 text-neutral-100">
@@ -490,24 +616,84 @@ function GeneratePageInner() {
               </section>
             )}
 
-            <button
-              onClick={onGenerate}
-              disabled={
-                running ||
-                !signalBrief.trim() ||
-                !(selectedAngle || customAngle.trim())
-              }
-              className="w-full rounded-md bg-white px-6 py-3 font-medium text-black hover:bg-neutral-200 disabled:opacity-50 disabled:cursor-not-allowed"
-              title={
-                !signalBrief.trim()
-                  ? 'Need a trends brief'
-                  : !(selectedAngle || customAngle.trim())
-                  ? 'Pick or type an angle first'
-                  : ''
-              }
-            >
-              {running ? 'Generating…' : 'Generate pillar + variations'}
-            </button>
+            {/* Stage controls — two-phase generation */}
+            {!draftComplete && !draftRunning && (
+              <button
+                onClick={onGenerateDraft}
+                disabled={
+                  running ||
+                  !signalBrief.trim() ||
+                  !(selectedAngle || customAngle.trim())
+                }
+                className="w-full rounded-md bg-white px-6 py-3 font-medium text-black hover:bg-neutral-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                title={
+                  !signalBrief.trim()
+                    ? 'Need a trends brief'
+                    : !(selectedAngle || customAngle.trim())
+                    ? 'Pick or type an angle first'
+                    : ''
+                }
+              >
+                Generate draft
+              </button>
+            )}
+
+            {draftRunning && (
+              <button
+                disabled
+                className="w-full rounded-md bg-neutral-700 px-6 py-3 font-medium text-neutral-300"
+              >
+                Generating draft… (~1-2 min)
+              </button>
+            )}
+
+            {draftComplete && !variationsRunning && !variationsComplete && (
+              <div className="space-y-2">
+                <button
+                  onClick={onGenerateVariations}
+                  className="w-full rounded-md bg-white px-6 py-3 font-medium text-black hover:bg-neutral-200"
+                >
+                  Generate variations →
+                </button>
+                <button
+                  onClick={onGenerateDraft}
+                  className="w-full rounded-md border border-neutral-700 px-6 py-2 text-sm text-neutral-300 hover:bg-neutral-800"
+                >
+                  ↻ Regenerate draft
+                </button>
+              </div>
+            )}
+
+            {variationsRunning && (
+              <button
+                disabled
+                className="w-full rounded-md bg-neutral-700 px-6 py-3 font-medium text-neutral-300"
+              >
+                Generating variations… (~1-2 min)
+              </button>
+            )}
+
+            {variationsComplete && (
+              <div className="space-y-2">
+                <div className="rounded-md border border-green-900/50 bg-green-950/20 px-4 py-3 text-sm text-green-300">
+                  ✓ Draft + 4 variations ready. Review on the right.
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={onGenerateVariations}
+                    className="flex-1 rounded-md border border-neutral-700 px-4 py-2 text-xs text-neutral-300 hover:bg-neutral-800"
+                  >
+                    ↻ Regenerate variations
+                  </button>
+                  <button
+                    onClick={onGenerateDraft}
+                    className="flex-1 rounded-md border border-neutral-700 px-4 py-2 text-xs text-neutral-300 hover:bg-neutral-800"
+                  >
+                    ↻ Regenerate draft
+                  </button>
+                </div>
+              </div>
+            )}
 
             {errorMessage && (
               <div className="rounded-md border border-red-900 bg-red-950/50 px-4 py-3 text-sm text-red-300">
