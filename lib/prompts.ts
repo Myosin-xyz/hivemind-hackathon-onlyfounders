@@ -90,9 +90,80 @@ RULES:
 - Be specific. Reference specific trends or pattern data by name.`;
 }
 
+// ─── Angle proposals (runs after gap_analysis in conversation) ──
+
+// Asks Hivemind to convert the just-produced gap_analysis into 3-5 distinct
+// pickable angle proposals. Returns a JSON array — UI parses and renders cards.
+export function angleProposalsPrompt(): string {
+  return `You've just produced a gap analysis (above in our conversation). Now turn that analysis into 3-5 DISTINCT angle proposals the founder can choose between for their pillar post.
+
+For each proposal, output a JSON object with these fields:
+- title: the angle in 8-15 words (this is a draft headline for the post)
+- hook_style: one of "provocative" | "insight" | "story" | "contrarian"
+- summary: 2-3 sentences explaining what the post would argue and why it matters
+- gap_reference: which specific gap from your analysis this addresses (quote a key phrase)
+
+Output as a JSON array. NO markdown wrapper, NO prose around it, NO preamble. Just the array.
+
+Rules:
+- Each angle must be DISTINCT (different hook style OR different gap)
+- Specific to THIS founder's positioning — use the project context
+- No generic AI commentary like "AI is transforming..."
+- 3-5 angles, no more, no fewer
+- Each title should be punchy enough to work as a real headline
+
+Example shape (follow exactly):
+[
+  {
+    "title": "Why founder-led content is the only moat AI can't replicate",
+    "hook_style": "contrarian",
+    "summary": "Most founders are outsourcing voice to AI tools and getting flattened in the feed. The angle reframes voice as the moat — show what gets lost when founders outsource and what survives.",
+    "gap_reference": "founder absent from the 'AI ate content' conversation"
+  }
+]`;
+}
+
 // ─── Brief (builds on gap analysis via conversationId) ─────
 
-export function briefPrompt(): string {
+// If selectedAngle is provided (from /api/angles), the brief develops AROUND
+// that angle. Otherwise it picks the highest-leverage angle from the gap
+// analysis on its own.
+export function briefPrompt(selectedAngle?: string): string {
+  if (selectedAngle) {
+    return `The angle for this pillar has been chosen:
+
+> ${selectedAngle}
+
+Develop a detailed pillar post brief AROUND this angle. Use the gap analysis and signal brief already in our conversation history for grounding.
+
+Output as markdown:
+
+## Angle
+[Restate the chosen angle as one sharp sentence]
+
+## Hook Style
+[provocative / insight / story / contrarian — what fits THIS angle best]
+
+## Three Key Arguments
+1. ...
+2. ...
+3. ...
+
+## Doctrine Connection
+[Which of the founder's named principles anchors this — reference the voice profile's doctrine section]
+
+## Asymmetric Move
+[What makes this NOT generic — the specific reframe or insight only this founder would make]
+
+## Format Fit
+[Long-form LinkedIn for the pillar. ~600-900 words. Brief reasoning.]
+
+## Unexpected Adjacent Frame
+[One unexpected adjacent-domain analogy or principle to weave in]
+
+Be specific to the chosen angle. Reference the gap analysis.`;
+  }
+
   return `Based on the gap analysis just produced, write a detailed pillar post brief for this week.
 
 Output as markdown:

@@ -152,26 +152,30 @@ export async function runGeneration(
     }
   }
 
-  // Step: gap analysis.
-  results.gap_analysis = await runStep('gap_analysis', callbacks, async () => {
-    const res = await hivemind.appendToConversation(
-      founder.conversationId!,
-      prompts.gapAnalysisPrompt({
-        founderName: founder.name,
-        recentPosts: founder.recentPosts,
-        signalBrief: request.signalBrief,
-        nichePatterns,
-      }),
-      'gtm-architect',
-    );
-    return res.response;
-  });
+  // Step: gap analysis — SKIPPED if angle was pre-selected via /api/angles.
+  // In that flow the gap analysis was already run and lives in the conversation
+  // thread, so re-running here would be a wasted Hivemind call.
+  if (!request.angle) {
+    results.gap_analysis = await runStep('gap_analysis', callbacks, async () => {
+      const res = await hivemind.appendToConversation(
+        founder.conversationId!,
+        prompts.gapAnalysisPrompt({
+          founderName: founder.name,
+          recentPosts: founder.recentPosts,
+          signalBrief: request.signalBrief,
+          nichePatterns,
+        }),
+        'gtm-architect',
+      );
+      return res.response;
+    });
+  }
 
-  // Step: brief.
+  // Step: brief — develops around the selected angle if one was passed in.
   results.brief = await runStep('brief', callbacks, async () => {
     const res = await hivemind.appendToConversation(
       founder.conversationId!,
-      prompts.briefPrompt(),
+      prompts.briefPrompt(request.angle),
       'genius-strategist',
     );
     return res.response;

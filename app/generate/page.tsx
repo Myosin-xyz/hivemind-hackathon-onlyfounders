@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import type { PipelineEvent, PipelineStep, TrendBrief } from '@/lib/types';
+import type { PipelineEvent, PipelineStep, TrendBrief, AngleProposal, AnglesResponse } from '@/lib/types';
 
 const STEP_LABELS: Record<PipelineStep, string> = {
   voice_extraction: 'Voice extraction',
@@ -46,6 +46,21 @@ function countBySource(signals: { source: string }[]): Record<string, number> {
   }, {} as Record<string, number>);
 }
 
+function hookChipClass(hookStyle: string): string {
+  switch (hookStyle) {
+    case 'provocative':
+      return 'border border-red-900/50 bg-red-950/40 text-red-300';
+    case 'contrarian':
+      return 'border border-amber-900/50 bg-amber-950/40 text-amber-300';
+    case 'insight':
+      return 'border border-blue-900/50 bg-blue-950/40 text-blue-300';
+    case 'story':
+      return 'border border-green-900/50 bg-green-950/40 text-green-300';
+    default:
+      return 'border border-neutral-700 bg-neutral-800 text-neutral-300';
+  }
+}
+
 export default function GeneratePage() {
   return (
     <Suspense fallback={<div className="p-8 text-neutral-400">Loading…</div>}>
@@ -67,6 +82,13 @@ function GeneratePageInner() {
   const [trendBrief, setTrendBrief] = useState<TrendBrief | null>(null);
   const [trendsLoading, setTrendsLoading] = useState(false);
   const [trendsError, setTrendsError] = useState<string | null>(null);
+
+  // Angle picker state
+  const [anglesData, setAnglesData] = useState<AnglesResponse | null>(null);
+  const [anglesLoading, setAnglesLoading] = useState(false);
+  const [anglesError, setAnglesError] = useState<string | null>(null);
+  const [selectedAngle, setSelectedAngle] = useState<string>('');
+  const [customAngle, setCustomAngle] = useState<string>('');
 
   const [stepStates, setStepStates] = useState<Record<string, StepState>>({});
   const [stepOutputs, setStepOutputs] = useState<Record<string, string>>({});
@@ -95,6 +117,11 @@ function GeneratePageInner() {
     if (!t.trim()) return;
     setTrendsLoading(true);
     setTrendsError(null);
+    // Fresh trends invalidate prior angles
+    setAnglesData(null);
+    setAnglesError(null);
+    setSelectedAngle('');
+    setCustomAngle('');
     try {
       const res = await fetch('/api/trends', {
         method: 'POST',
@@ -112,12 +139,39 @@ function GeneratePageInner() {
     }
   }
 
+  async function proposeAngles(): Promise<void> {
+    if (!founderId || !signalBrief.trim()) return;
+    setAnglesLoading(true);
+    setAnglesError(null);
+    setSelectedAngle('');
+    setCustomAngle('');
+    try {
+      const res = await fetch('/api/angles', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ founderId, signalBrief }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message ?? 'Propose angles failed');
+      setAnglesData(data);
+    } catch (err) {
+      setAnglesError(err instanceof Error ? err.message : 'Propose angles failed');
+    } finally {
+      setAnglesLoading(false);
+    }
+  }
+
   async function onGenerate() {
     if (!founderId || !signalBrief.trim()) return;
+    const angle = (selectedAngle || customAngle).trim();
+    if (!angle) return;
 
     setRunning(true);
     setErrorMessage(null);
-    setStepStates(Object.fromEntries(GENERATION_STEPS.map((s) => [s, 'pending'])));
+    // When angle is pre-selected, the pipeline skips gap_analysis (already run
+    // during /api/angles). Mirror that in the visible step list.
+    const stepsForRun = GENERATION_STEPS.filter((s) => s !== 'gap_analysis');
+    setStepStates(Object.fromEntries(stepsForRun.map((s) => [s, 'pending'])));
     setStepOutputs({});
 
     abortRef.current = new AbortController();
@@ -126,7 +180,7 @@ function GeneratePageInner() {
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ founderId, signalBrief }),
+        body: JSON.stringify({ founderId, signalBrief, angle }),
         signal: abortRef.current.signal,
       });
 
@@ -197,6 +251,18 @@ function GeneratePageInner() {
       </main>
     );
   }
+
+  // Angle-driven flow skips gap_analysis (it ran in /api/angles instead).
+  // Reflect that in the pipeline list and output tabs.
+  const angleSelected = !!(selectedAngle || customAngle.trim());
+  const visiblePipelineSteps = angleSelected
+    ? GENERATION_STEPS.filter((s) => s !== 'gap_analysis')
+    : GENERATION_STEPS;
+  const visibleOutputTabs: PipelineStep[] = (
+    angleSelected
+      ? ['brief', 'draft_pillar', 'qc', 'repurpose_x_thread', 'repurpose_blog', 'repurpose_newsletter', 'repurpose_video_script']
+      : ['gap_analysis', 'brief', 'draft_pillar', 'qc', 'repurpose_x_thread', 'repurpose_blog', 'repurpose_newsletter', 'repurpose_video_script']
+  );
 
   return (
     <main className="min-h-screen bg-neutral-950 text-neutral-100">
@@ -311,12 +377,136 @@ function GeneratePageInner() {
               )}
             </section>
 
+            {/* Angle picker — between trends and generation */}
+            {trendBrief && signalBrief.trim() && (
+              <section>
+                <div className="mb-3 flex items-center justify-between">
+                  <h2 className="text-lg font-semibold">Angle</h2>
+                  {anglesData && (
+                    <button
+                      type="button"
+                      onClick={proposeAngles}
+                      disabled={anglesLoading}
+                      className="text-xs text-neutral-400 hover:text-neutral-200 disabled:opacity-50"
+                    >
+                      ↻ Re-propose
+                    </button>
+                  )}
+                </div>
+
+                {!anglesData && !anglesLoading && (
+                  <div className="rounded-md border border-neutral-800 bg-neutral-900 p-4">
+                    <p className="mb-3 text-sm text-neutral-400">
+                      Hivemind will analyze the brief + your project context and propose
+                      3-5 distinct angles to choose from.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={proposeAngles}
+                      className="rounded-md bg-white px-4 py-2 text-sm font-medium text-black hover:bg-neutral-200"
+                    >
+                      Propose angles
+                    </button>
+                  </div>
+                )}
+
+                {anglesLoading && (
+                  <div className="rounded-md border border-neutral-800 bg-neutral-900 p-6 text-center text-sm text-neutral-400">
+                    Running gap analysis + angle proposals (~20s)…
+                  </div>
+                )}
+
+                {anglesError && (
+                  <div className="rounded-md border border-red-900 bg-red-950/50 px-3 py-2 text-xs text-red-300">
+                    {anglesError}
+                  </div>
+                )}
+
+                {anglesData && (
+                  <>
+                    <div className="mb-3 space-y-2">
+                      {anglesData.proposals.map((p, i) => {
+                        const isSelected = selectedAngle === p.title;
+                        return (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => {
+                              setSelectedAngle(p.title);
+                              setCustomAngle('');
+                            }}
+                            className={`w-full rounded-lg border p-4 text-left transition-colors ${
+                              isSelected
+                                ? 'border-blue-600 bg-blue-950/30'
+                                : 'border-neutral-800 bg-neutral-900 hover:border-neutral-700'
+                            }`}
+                          >
+                            <div className="mb-1.5 flex items-center gap-2">
+                              <span className={`rounded px-1.5 py-0.5 text-[10px] font-mono uppercase ${hookChipClass(p.hook_style)}`}>
+                                {p.hook_style}
+                              </span>
+                              {isSelected && (
+                                <span className="text-[10px] font-mono text-blue-400">SELECTED</span>
+                              )}
+                            </div>
+                            <h3 className="mb-1.5 text-base font-medium text-neutral-100">{p.title}</h3>
+                            <p className="mb-2 text-sm text-neutral-400">{p.summary}</p>
+                            {p.gap_reference && (
+                              <div className="text-xs text-neutral-500">
+                                Addresses: <span className="italic">{p.gap_reference}</span>
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="mb-3">
+                      <label className="mb-1 block text-xs text-neutral-400">
+                        Or type your own angle:
+                      </label>
+                      <input
+                        type="text"
+                        value={customAngle}
+                        onChange={(e) => {
+                          setCustomAngle(e.target.value);
+                          if (e.target.value.trim()) setSelectedAngle('');
+                        }}
+                        placeholder="Your own angle in one sentence…"
+                        className="w-full rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-200"
+                      />
+                    </div>
+
+                    <details>
+                      <summary className="cursor-pointer text-xs text-neutral-400 hover:text-neutral-200">
+                        Show gap analysis (the reasoning behind these angles)
+                      </summary>
+                      <pre className="mt-2 max-h-72 overflow-y-auto whitespace-pre-wrap rounded-md border border-neutral-800 bg-neutral-950 p-3 text-xs text-neutral-300">
+                        {anglesData.gap_analysis}
+                      </pre>
+                    </details>
+                  </>
+                )}
+              </section>
+            )}
+
             <button
               onClick={onGenerate}
-              disabled={running || !signalBrief.trim()}
+              disabled={
+                running ||
+                !signalBrief.trim() ||
+                !(selectedAngle || customAngle.trim())
+              }
               className="w-full rounded-md bg-white px-6 py-3 font-medium text-black hover:bg-neutral-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              title={
+                !signalBrief.trim()
+                  ? 'Need a trends brief'
+                  : !(selectedAngle || customAngle.trim())
+                  ? 'Pick or type an angle first'
+                  : ''
+              }
             >
-              {running ? 'Generating…' : 'Generate'}
+              {running ? 'Generating…' : 'Generate pillar + variations'}
             </button>
 
             {errorMessage && (
@@ -328,7 +518,7 @@ function GeneratePageInner() {
             <section>
               <h3 className="mb-3 text-sm font-semibold text-neutral-300">Pipeline</h3>
               <ul className="space-y-1.5">
-                {GENERATION_STEPS.map((step) => {
+                {visiblePipelineSteps.map((step) => {
                   const state = stepStates[step] ?? 'pending';
                   return (
                     <li
@@ -363,24 +553,22 @@ function GeneratePageInner() {
           <div>
             <div className="sticky top-6">
               <div className="mb-3 flex gap-1 flex-wrap">
-                {(['gap_analysis', 'brief', 'draft_pillar', 'qc', 'repurpose_x_thread', 'repurpose_blog', 'repurpose_newsletter', 'repurpose_video_script'] as PipelineStep[]).map(
-                  (step) => (
-                    <button
-                      key={step}
-                      onClick={() => setActiveTab(step)}
-                      disabled={!stepOutputs[step]}
-                      className={`rounded-md px-3 py-1.5 text-xs ${
-                        activeTab === step
-                          ? 'bg-white text-black'
-                          : stepOutputs[step]
-                          ? 'border border-neutral-700 text-neutral-300 hover:bg-neutral-800'
-                          : 'border border-neutral-800 text-neutral-600 cursor-not-allowed'
-                      }`}
-                    >
-                      {STEP_LABELS[step]}
-                    </button>
-                  ),
-                )}
+                {visibleOutputTabs.map((step) => (
+                  <button
+                    key={step}
+                    onClick={() => setActiveTab(step)}
+                    disabled={!stepOutputs[step]}
+                    className={`rounded-md px-3 py-1.5 text-xs ${
+                      activeTab === step
+                        ? 'bg-white text-black'
+                        : stepOutputs[step]
+                        ? 'border border-neutral-700 text-neutral-300 hover:bg-neutral-800'
+                        : 'border border-neutral-800 text-neutral-600 cursor-not-allowed'
+                    }`}
+                  >
+                    {STEP_LABELS[step]}
+                  </button>
+                ))}
               </div>
 
               <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-4 max-h-[80vh] overflow-y-auto">

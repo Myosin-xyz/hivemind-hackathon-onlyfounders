@@ -143,6 +143,23 @@ export type GenerationRequest = {
   founderId: string;
   signalBrief: string;       // synthesized trend brief, or pasted text
   topic?: string;            // optional override
+  angle?: string;            // pre-selected angle from /api/angles — when set, pipeline skips gap_analysis
+};
+
+// ─── Angle picker (between trends and generation) ──────────
+
+export type AngleHookStyle = 'provocative' | 'insight' | 'story' | 'contrarian';
+
+export type AngleProposal = {
+  title: string;             // 8-15 words — draft headline
+  hook_style: AngleHookStyle;
+  summary: string;           // 2-3 sentences — what the post would argue
+  gap_reference: string;     // which gap from the gap analysis this addresses
+};
+
+export type AnglesResponse = {
+  gap_analysis: string;      // full gap analysis markdown for reference (collapsible in UI)
+  proposals: AngleProposal[];
 };
 
 // ─── Trends (multi-platform discovery) ──────────────────────

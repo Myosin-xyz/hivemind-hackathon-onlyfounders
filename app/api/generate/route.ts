@@ -8,8 +8,9 @@ export const maxDuration = 300; // Full pipeline can take 2-4 minutes
 
 type GenerateRequestBody = {
   founderId: string;
-  signalBrief: string;     // pasted last30days output
+  signalBrief: string;     // synthesized trend brief
   topic?: string;
+  angle?: string;          // pre-selected angle from /api/angles
 };
 
 // SSE streaming endpoint — pushes one event per pipeline step.
@@ -47,7 +48,12 @@ export async function POST(req: NextRequest) {
       try {
         await runGeneration(
           founder,
-          { founderId: body.founderId, signalBrief: body.signalBrief, topic: body.topic },
+          {
+            founderId: body.founderId,
+            signalBrief: body.signalBrief,
+            topic: body.topic,
+            angle: body.angle,
+          },
           {
             onEvent: (event) => {
               push(event);
