@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runOnboarding } from '@/lib/pipeline';
 import { createFounder } from '@/lib/store';
+import { parseDoctrineFromVoiceMd } from '@/lib/voiceSchema';
+import { inferNiche } from '@/lib/niches';
 import type { VoiceInput } from '@/lib/types';
 
 export const runtime = 'nodejs';
@@ -53,18 +55,31 @@ export async function POST(req: NextRequest) {
       twitterHandle: body.voice.twitterHandle,
     });
 
+    // Auto-fill doctrine from voice.md if user didn't provide one
+    let doctrine = body.doctrine ?? '';
+    if (!doctrine.trim()) {
+      const parsed = parseDoctrineFromVoiceMd(onboarded.styleGuide);
+      if (parsed) doctrine = parsed;
+    }
+
+    // Auto-infer niche from Hivemind's audiences/description if not provided
+    let niche = body.niche;
+    if (!niche) {
+      niche = inferNiche(onboarded.enriched, body.description);
+    }
+
     const founder = createFounder({
       name: body.name,
       websiteUrl: body.websiteUrl,
       description: body.description,
-      doctrine: body.doctrine ?? '',
+      doctrine,
       recentPosts: body.recentPosts ?? [],
       voiceInput: body.voice,
       hivemindProjectId: onboarded.hivemindProjectId,
       conversationId: onboarded.conversationId,
       styleGuide: onboarded.styleGuide,
       enriched: onboarded.enriched,
-      niche: body.niche,
+      niche,
       keywords: body.keywords,
     });
 

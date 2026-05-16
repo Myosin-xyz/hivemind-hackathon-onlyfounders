@@ -29,6 +29,7 @@ export default function FounderPage({ params }: { params: Promise<{ id: string }
 
   const [savingSection, setSavingSection] = useState<string | null>(null);
   const [showStyleGuide, setShowStyleGuide] = useState(false);
+  const [extractingDoctrine, setExtractingDoctrine] = useState(false);
 
   useEffect(() => {
     fetch(`/api/founders/${id}`)
@@ -67,6 +68,22 @@ export default function FounderPage({ params }: { params: Promise<{ id: string }
       setError(err instanceof Error ? err.message : 'Save failed');
     } finally {
       setSavingSection(null);
+    }
+  }
+
+  async function extractDoctrineFromContext(): Promise<void> {
+    setExtractingDoctrine(true);
+    try {
+      const res = await fetch(`/api/founders/${id}/extract-doctrine`, {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message ?? 'Extraction failed');
+      setDoctrine(data.doctrine);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Extraction failed');
+    } finally {
+      setExtractingDoctrine(false);
     }
   }
 
@@ -188,6 +205,17 @@ export default function FounderPage({ params }: { params: Promise<{ id: string }
           saving={savingSection === 'doctrine'}
           empty={!founder.doctrine}
           onSave={() => savePatch('doctrine', { doctrine })}
+          extraActions={
+            <button
+              type="button"
+              onClick={extractDoctrineFromContext}
+              disabled={extractingDoctrine}
+              className="rounded-md border border-neutral-700 px-4 py-1.5 text-xs hover:bg-neutral-800 disabled:opacity-50"
+              title="Use Hivemind to extract doctrine from your project context"
+            >
+              {extractingDoctrine ? 'Extracting…' : '✨ Extract from project'}
+            </button>
+          }
         >
           <textarea
             value={doctrine}
@@ -287,6 +315,7 @@ function EditableSection({
   emptyHighlight,
   saving,
   onSave,
+  extraActions,
   children,
 }: {
   title: string;
@@ -295,39 +324,66 @@ function EditableSection({
   emptyHighlight?: boolean;
   saving: boolean;
   onSave: () => void;
+  extraActions?: React.ReactNode;
   children: React.ReactNode;
 }) {
+  const [open, setOpen] = useState(false);
+
   return (
     <section
-      className={`mb-6 rounded-lg border p-5 ${
+      className={`mb-3 rounded-lg border transition-colors ${
         empty && emptyHighlight
           ? 'border-amber-900/50 bg-amber-950/10'
           : 'border-neutral-800 bg-neutral-900'
       }`}
     >
-      <div className="mb-3 flex items-baseline justify-between">
-        <div>
-          <h3 className="text-base font-semibold">
-            {title}
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={`w-full flex items-center justify-between gap-3 p-5 text-left hover:bg-neutral-800/30 ${
+          open ? 'rounded-t-lg' : 'rounded-lg'
+        }`}
+      >
+        <div className="min-w-0">
+          <h3 className="text-base font-semibold flex items-baseline gap-2">
+            <span>{title}</span>
             {empty && (
-              <span className="ml-2 text-xs font-normal text-amber-400">
-                {emptyHighlight ? '· recommended' : '· empty'}
+              <span
+                className={`text-xs font-normal ${
+                  emptyHighlight ? 'text-amber-400' : 'text-neutral-500'
+                }`}
+              >
+                · {emptyHighlight ? 'recommended' : 'empty'}
               </span>
             )}
+            {!empty && <span className="text-xs font-normal text-green-500">· set</span>}
           </h3>
-          <p className="text-xs text-neutral-500">{hint}</p>
+          <p className="mt-0.5 text-xs text-neutral-500">{hint}</p>
         </div>
-      </div>
-      {children}
-      <div className="mt-3 flex justify-end">
-        <button
-          onClick={onSave}
-          disabled={saving}
-          className="rounded-md bg-white px-4 py-1.5 text-xs font-medium text-black hover:bg-neutral-200 disabled:opacity-50"
+        <span
+          className={`shrink-0 text-neutral-500 transition-transform duration-150 ${
+            open ? 'rotate-90' : ''
+          }`}
         >
-          {saving ? 'Saving…' : 'Save'}
-        </button>
-      </div>
+          ›
+        </span>
+      </button>
+
+      {open && (
+        <div className="px-5 pb-5">
+          {children}
+          <div className="mt-3 flex flex-wrap justify-end gap-2">
+            {extraActions}
+            <button
+              onClick={onSave}
+              disabled={saving}
+              className="rounded-md bg-white px-4 py-1.5 text-xs font-medium text-black hover:bg-neutral-200 disabled:opacity-50"
+            >
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

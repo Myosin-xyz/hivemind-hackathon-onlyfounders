@@ -49,6 +49,23 @@ export function fillSchema(founderName: string): string {
   return VOICE_PROFILE_SCHEMA.replace('{{founder_name}}', founderName);
 }
 
+// Parse the "Core POVs (Doctrine)" section out of a voice.md / style guide.
+// Returns the body of that section as markdown bullet list, or null if not found
+// or empty / template-only.
+export function parseDoctrineFromVoiceMd(content: string): string | null {
+  // Match "## Core POVs" (with optional " (Doctrine)") and capture body
+  // until the next H2 or end of string.
+  const match = content.match(/##\s+Core POVs[^\n]*\n([\s\S]+?)(?=\n##\s+|\n*$)/i);
+  if (!match) return null;
+
+  const section = match[1].trim();
+  // Skip template placeholder text.
+  if (section.includes('[Named principle 1]')) return null;
+  if (section.length < 20) return null;
+
+  return section;
+}
+
 // Lightweight check that an uploaded voice.md follows the expected structure.
 // Not strict — just verifies the major section headers exist.
 export function validateVoiceMd(content: string): { valid: boolean; missing: string[] } {
