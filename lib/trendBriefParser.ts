@@ -1,9 +1,12 @@
 // Parser for the structured trend brief Hivemind/Claude produces.
-// Our synthesis prompt dictates 3 sections — Top conversations / Patterns observed / Whitespace —
-// so we can parse them into typed data and render rich cards instead of raw markdown.
+// Our synthesis prompt dictates 3 sections — Top conversations / Patterns observed /
+// Whitespace — but the LLM drifts on the exact format between runs. The parser
+// is intentionally tolerant: multiple section-header styles, multiple numbered-
+// item formats, and a fallback that preserves unparseable content rather than
+// dropping it silently.
 //
-// If parsing fails (LLM drifts from the format), the caller can fall back to
-// showing the raw markdown.
+// If everything fails the parser returns null and the caller falls back to
+// rendering the raw markdown.
 
 export type ConversationItem = {
   title: string;
@@ -24,34 +27,41 @@ export type ParsedBrief = {
   topConversations: ConversationItem[];
   patterns: NumberedItem[];
   whitespace: NumberedItem[];
-  weakAssumption?: string;   // Trailing pull-out sentence
+  weakAssumption?: string;
 };
 
 export function parseTrendBrief(markdown: string): ParsedBrief | null {
   try {
     const sections = splitBySections(markdown);
 
+    // Loose section-name matching — the LLM uses "Patterns" / "Patterns observed" /
+    // "Patterns Observed" / "Pattern observed" interchangeably.
     const topConversations = parseTopConversations(
-      sections['top conversations'] ?? '',
+      findSection(sections, ['top conversations', 'conversations', 'top conversation']) ?? '',
     );
-    const patterns = parseNumberedItems(sections['patterns observed'] ?? '');
-    let whitespace = parseNumberedItems(sections['whitespace'] ?? '');
+    let patterns = parseNumberedItems(
+      findSection(sections, ['patterns observed', 'patterns', 'pattern observed', 'observed patterns']) ?? '',
+    );
+    let whitespace = parseNumberedItems(
+      findSection(sections, ['whitespace', 'white space', 'whitespace opportunities', 'opportunities']) ?? '',
+    );
 
-    // Sometimes the LLM closes Whitespace with a trailing "The weakest assumption: ..."
-    // sentence that isn't a numbered item — pull it out separately.
+    // Pull the trailing "Weakest assumption: ..." sentence out of the
+    // whitespace block (it sometimes appears as a sibling, sometimes inside
+    // the last whitespace item).
     let weakAssumption: string | undefined;
-    const whitespaceText = sections['whitespace'] ?? '';
+    const whitespaceText = findSection(sections, ['whitespace', 'white space']) ?? '';
     const weakMatch = whitespaceText.match(
-      /(?:^|\n)\s*(?:The weakest assumption|Weakest assumption)[:\s]+([\s\S]+?)(?:\n\s*$|$)/i,
+      /(?:^|\n)\s*(?:The weakest assumption|Weakest assumption|The weak assumption)[:\s]+([\s\S]+?)(?:\n\s*$|$)/i,
     );
     if (weakMatch) weakAssumption = weakMatch[1].trim();
 
-    // Defensive: if the last whitespace item's body got polluted by the
-    // "weakest assumption" sentence, strip it back.
+    // Strip the assumption back out of the last whitespace item's body if it
+    // got captured there.
     if (weakAssumption && whitespace.length > 0) {
       const last = whitespace[whitespace.length - 1];
       const cleaned = last.body
-        .replace(/\n\s*(?:The weakest assumption|Weakest assumption)[\s\S]*$/i, '')
+        .replace(/\n\s*(?:The weakest assumption|Weakest assumption|The weak assumption)[\s\S]*$/i, '')
         .trim();
       whitespace = [...whitespace.slice(0, -1), { ...last, body: cleaned }];
     }
@@ -65,33 +75,59 @@ export function parseTrendBrief(markdown: string): ParsedBrief | null {
     }
 
     return { topConversations, patterns, whitespace, weakAssumption };
-  } catch {
+  } catch (err) {
+    console.warn('[trendBriefParser] parse failed:', err);
     return null;
   }
 }
 
-// Split markdown by `## Section Title` headers. Returns lowercased title → body.
+// ─── Helpers ──────────────────────────────────────────────
+
+// Lookup a section by trying multiple lowercase candidates.
+function findSection(sections: Record<string, string>, candidates: string[]): string | null {
+  for (const c of candidates) {
+    if (sections[c]) return sections[c];
+  }
+  // Loose substring match: "patterns observed in the data" → matches "patterns"
+  for (const [key, value] of Object.entries(sections)) {
+    if (candidates.some((c) => key.includes(c))) return value;
+  }
+  return null;
+}
+
+// Split markdown by section headers. Accepts ## or ### markdown headers, and
+// also lines that are entirely **Bold:** or **Bold** styled (LLM sometimes
+// uses those instead of real headers).
 function splitBySections(md: string): Record<string, string> {
   const lines = md.split('\n');
   const sections: Record<string, string> = {};
   let currentTitle: string | null = null;
   let currentLines: string[] = [];
 
+  const finalize = () => {
+    if (currentTitle !== null) {
+      const key = currentTitle.toLowerCase().replace(/[:.]\s*$/, '').trim();
+      sections[key] = currentLines.join('\n').trim();
+    }
+  };
+
   for (const line of lines) {
-    const h2Match = line.match(/^##\s+(.+?)\s*$/);
-    if (h2Match) {
-      if (currentTitle !== null) {
-        sections[currentTitle.toLowerCase()] = currentLines.join('\n').trim();
-      }
-      currentTitle = h2Match[1].trim();
+    // Match ## or ### headers
+    const h2Match = line.match(/^#{2,3}\s+(.+?)\s*$/);
+    // Match bold-only lines like **Patterns observed:** or **Whitespace**
+    const boldHeaderMatch =
+      !h2Match && line.match(/^\s*\*\*([^*\n]+?)\*\*\s*:?\s*$/);
+    const match = h2Match ?? boldHeaderMatch;
+
+    if (match) {
+      finalize();
+      currentTitle = match[1].trim();
       currentLines = [];
     } else if (currentTitle !== null) {
       currentLines.push(line);
     }
   }
-  if (currentTitle !== null) {
-    sections[currentTitle.toLowerCase()] = currentLines.join('\n').trim();
-  }
+  finalize();
 
   return sections;
 }
@@ -99,20 +135,14 @@ function splitBySections(md: string): Record<string, string> {
 // Each top-conversation block looks like:
 //   - **Title here** — Source, 12,345 — body sentence [N].
 //     > "quote"
-// or sometimes a multi-line body before the quote.
 function parseTopConversations(text: string): ConversationItem[] {
   const items: ConversationItem[] = [];
-
-  // Split on `\n- **` (each item starts with a bullet + bold title).
-  // Keep the first item by allowing optional leading hyphen at start.
   const blocks = text.split(/\n(?=- \*\*)/);
 
   for (const rawBlock of blocks) {
     const block = rawBlock.trim();
     if (!block.startsWith('- **')) continue;
 
-    // Title and meta on the first line.
-    // - **Title** — Reddit, 14,425 — body [1].
     const lines = block.split('\n');
     const firstLine = lines[0];
 
@@ -122,8 +152,6 @@ function parseTopConversations(text: string): ConversationItem[] {
     const title = titleMatch[1].trim();
     const afterTitle = (titleMatch[2] ?? '').trim();
 
-    // afterTitle could be "Reddit, 14,425 — body sentence [1]."
-    // or just "body sentence" if no source/engagement
     let source: string | undefined;
     let engagement: number | undefined;
     let body = afterTitle;
@@ -137,14 +165,12 @@ function parseTopConversations(text: string): ConversationItem[] {
       body = (sourceMatch[3] ?? '').trim();
     }
 
-    // Citation [N] usually appears at the end of body.
     let citationRef: number | undefined;
     const citMatch = body.match(/\[(\d+)\]\.?\s*$/);
     if (citMatch) {
       citationRef = parseInt(citMatch[1], 10);
     }
 
-    // Quote on a subsequent line: `  > "quote text"`
     let quote: string | undefined;
     for (let i = 1; i < lines.length; i++) {
       const l = lines[i].trim();
@@ -162,24 +188,70 @@ function parseTopConversations(text: string): ConversationItem[] {
   return items;
 }
 
-// Each numbered item looks like:
-//   **1. Short title here.** Body paragraph that can wrap multiple lines until
-//   the next **2. ...** boundary.
+// Numbered items: try multiple format variations. The LLM drifts between:
+//   **1. Title.** Body...
+//   **1.** Title.\n\nBody...
+//   1. **Title.** Body...
+//   ### 1. Title\n\nBody...
+//   **1. Title**\nBody...
+// If everything fails, preserve unparseable substantial blocks as numbered
+// items so content is never silently dropped.
 function parseNumberedItems(text: string): NumberedItem[] {
+  if (!text.trim()) return [];
+
   const items: NumberedItem[] = [];
 
-  // Split on `\n**N. ` boundaries. Anchored to start of line.
-  const blocks = text.split(/\n(?=\*\*\d+\.)/);
+  // Try several split boundaries in order of specificity
+  const splitPatterns = [
+    /\n(?=\*\*\d+\.)/,           // **1. ...
+    /\n(?=\d+\.\s+\*\*)/,         // 1. **Title**
+    /\n(?=###\s+\d+)/,            // ### 1. Title
+    /\n\n(?=\*\*\d+)/,            // **1** (blank line before)
+  ];
+
+  let blocks: string[] = [text];
+  for (const pat of splitPatterns) {
+    if (text.match(pat)) {
+      blocks = text.split(pat);
+      break;
+    }
+  }
+
+  // Per-block regex variants
+  const matchPatterns: Array<{ re: RegExp; numIdx: number; titleIdx: number; bodyIdx: number }> = [
+    { re: /^\*\*(\d+)\.\s+([\s\S]+?)\.?\*\*\s*([\s\S]*)$/, numIdx: 1, titleIdx: 2, bodyIdx: 3 },     // **1. Title.** body
+    { re: /^\*\*(\d+)\.?\*\*\s+([^\n*]+?)\.?\s*\n+([\s\S]*)$/, numIdx: 1, titleIdx: 2, bodyIdx: 3 }, // **1.** Title \n body
+    { re: /^(\d+)\.\s+\*\*([^*]+?)\*\*\s*([\s\S]*)$/, numIdx: 1, titleIdx: 2, bodyIdx: 3 },          // 1. **Title** body
+    { re: /^###\s+(\d+)\.\s+([^\n]+?)\.?\s*\n+([\s\S]*)$/, numIdx: 1, titleIdx: 2, bodyIdx: 3 },     // ### 1. Title \n body
+  ];
 
   for (const rawBlock of blocks) {
     const block = rawBlock.trim();
-    const m = block.match(/^\*\*(\d+)\.\s+([\s\S]+?)\*\*\s*([\s\S]*)$/);
-    if (!m) continue;
+    if (!block) continue;
 
-    const number = parseInt(m[1], 10);
-    const title = m[2].trim().replace(/\.$/, '');
-    const body = m[3].trim();
-    items.push({ number, title, body });
+    let matched = false;
+    for (const { re, numIdx, titleIdx, bodyIdx } of matchPatterns) {
+      const m = block.match(re);
+      if (m) {
+        items.push({
+          number: parseInt(m[numIdx], 10),
+          title: m[titleIdx].trim().replace(/\.$/, ''),
+          body: m[bodyIdx].trim(),
+        });
+        matched = true;
+        break;
+      }
+    }
+
+    // Graceful degradation: preserve unmatched but substantial blocks
+    if (!matched && block.length > 60) {
+      const firstLine = block.split('\n')[0].replace(/^[\d.*\s]+/, '').trim();
+      items.push({
+        number: items.length + 1,
+        title: firstLine.slice(0, 100) || '(untitled)',
+        body: block,
+      });
+    }
   }
 
   return items;
