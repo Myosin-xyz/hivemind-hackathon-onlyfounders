@@ -12,6 +12,8 @@
 // - Query planner with subqueries (single-pass is enough for hackathon)
 
 import type { TrendBrief, RawSignal, TrendSource } from './types';
+import * as beacon from './beacon';
+import * as hivemind from './hivemind';
 
 const USER_AGENT = 'OnlyFounders/0.1 (hackathon build)';
 
@@ -165,6 +167,24 @@ async function fetchPolymarket(topic: string): Promise<RawSignal[]> {
   }
 }
 
+// ─── Source: Beacon X signal feed ───────────────────────────
+
+async function fetchBeaconX(niche: string): Promise<RawSignal[]> {
+  if (!beacon.beaconConfigured) return [];
+  try {
+    const { posts } = await beacon.getSignalFeed(niche, {
+      source: 'twitter',
+      limit: 30,
+      sort: 'virality',
+      minVirality: 0.1,
+    });
+    return posts.map(beacon.beaconSignalToRaw);
+  } catch (err) {
+    console.warn('[trends] Beacon signal feed failed:', err);
+    return [];
+  }
+}
+
 // ─── Synthesis (Claude rank + brief) ────────────────────────
 
 async function synthesizeTrends(
@@ -241,11 +261,72 @@ Rules:
   return data.content?.[0]?.text ?? '';
 }
 
+// Hivemind-grounded synthesis — appends to the founder's conversation thread
+// so the LLM has full project context (positioning, audiences, doctrine, prior
+// pipeline messages) when ranking signals and writing the brief.
+async function synthesizeViaHivemind(
+  signals: RawSignal[],
+  topic: string,
+  days: number,
+  conversationId: string,
+): Promise<string> {
+  const compact = signals
+    .slice()
+    .sort((a, b) => b.engagement - a.engagement)
+    .slice(0, 40)
+    .map((s, i) => ({
+      idx: i + 1,
+      source: s.source,
+      title: s.title,
+      author: s.author,
+      engagement: s.engagement,
+      snippet: s.snippet?.slice(0, 200),
+      created_at: s.created_at.slice(0, 10),
+      url: s.url,
+    }));
+
+  const prompt = `Synthesize a trend brief for this founder using the project context already loaded in our conversation.
+
+TOPIC: ${topic}
+LOOKBACK: last ${days} days
+
+RAW SIGNALS (sorted by engagement across Reddit, HN, Polymarket, and Beacon X — top ${compact.length}):
+${JSON.stringify(compact, null, 2)}
+
+Produce a structured markdown brief grounded in THIS founder's positioning:
+
+## Top conversations
+Pick 5-7 highest-signal items RELEVANT to this founder's space. Each:
+- **[title]** — [source, engagement] — one sentence on why it matters to THIS founder specifically (use the project context)
+- > short quote/excerpt from the signal
+
+## Patterns observed
+3-4 meta-narratives across signals, framed against this founder's domain and audiences.
+
+## Whitespace
+1-2 angles NOT being talked about that THIS founder is uniquely positioned to occupy, given their doctrine and positioning.
+
+Rules:
+- Use the founder's project context to filter relevance — what would matter to their audiences, not generic "ai marketing" takes
+- Cite signals by index ([1], [2], etc.)
+- No generic AI commentary
+- No preamble — output the brief directly`;
+
+  const res = await hivemind.appendToConversation(
+    conversationId,
+    prompt,
+    'genius-strategist',
+  );
+  return res.response;
+}
+
 // ─── Public API ─────────────────────────────────────────────
 
 export type FetchTrendsOptions = {
   days?: number;
   sources?: TrendSource[];
+  niche?: string;            // for Beacon X feed (requires beacon-x in enabled sources)
+  conversationId?: string;   // for Hivemind-grounded synthesis (project context)
 };
 
 export async function fetchTrends(
@@ -253,15 +334,23 @@ export async function fetchTrends(
   options: FetchTrendsOptions = {},
 ): Promise<TrendBrief> {
   const days = options.days ?? 30;
-  const enabledSources = options.sources ?? ['reddit', 'hackernews', 'polymarket'];
+  const enabledSources = options.sources ?? ['reddit', 'hackernews', 'polymarket', 'beacon-x'];
 
   const tasks: Promise<RawSignal[]>[] = [];
   if (enabledSources.includes('reddit')) tasks.push(fetchReddit(topic, days));
   if (enabledSources.includes('hackernews')) tasks.push(fetchHackerNews(topic, days));
   if (enabledSources.includes('polymarket')) tasks.push(fetchPolymarket(topic));
+  if (enabledSources.includes('beacon-x') && options.niche) {
+    tasks.push(fetchBeaconX(options.niche));
+  }
 
   const results = await Promise.all(tasks);
   const allSignals = results.flat();
+
+  // Compute the sources we actually pulled data from (in case some returned empty)
+  const sourcesWithSignals = Array.from(
+    new Set(allSignals.map((s) => s.source)),
+  ) as TrendSource[];
 
   if (allSignals.length === 0) {
     return {
@@ -271,18 +360,26 @@ export async function fetchTrends(
       raw_count: 0,
       signals: [],
       brief: `No signals found for "${topic}" across ${enabledSources.join(', ')} in the last ${days} days. Try a broader topic or a longer window.`,
+      hivemind_grounded: false,
     };
   }
 
   const sorted = allSignals.slice().sort((a, b) => b.engagement - a.engagement);
-  const brief = await synthesizeTrends(sorted, topic, days);
+
+  // Hivemind-grounded synthesis when conversationId is provided.
+  // Falls back to direct Claude call (generic synthesis) otherwise.
+  const useHivemind = !!options.conversationId;
+  const brief = useHivemind
+    ? await synthesizeViaHivemind(sorted, topic, days, options.conversationId!)
+    : await synthesizeTrends(sorted, topic, days);
 
   return {
     topic,
     generated_at: new Date().toISOString(),
-    sources_used: enabledSources,
+    sources_used: sourcesWithSignals,
     raw_count: allSignals.length,
     signals: sorted.slice(0, 50),
     brief,
+    hivemind_grounded: useHivemind,
   };
 }

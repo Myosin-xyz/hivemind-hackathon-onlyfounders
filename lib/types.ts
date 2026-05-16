@@ -147,7 +147,7 @@ export type GenerationRequest = {
 
 // ─── Trends (multi-platform discovery) ──────────────────────
 
-export type TrendSource = 'reddit' | 'hackernews' | 'polymarket';
+export type TrendSource = 'reddit' | 'hackernews' | 'polymarket' | 'beacon-x';
 
 export type RawSignal = {
   source: TrendSource;
@@ -167,4 +167,5 @@ export type TrendBrief = {
   raw_count: number;
   signals: RawSignal[];      // top N sorted by engagement
   brief: string;             // synthesized markdown
+  hivemind_grounded: boolean; // true if synth ran via Hivemind chat with projectId context
 };

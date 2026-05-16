@@ -32,6 +32,20 @@ const GENERATION_STEPS: PipelineStep[] = [
 
 type StepState = 'pending' | 'in_progress' | 'completed' | 'failed';
 
+const SOURCE_LABELS: Record<string, string> = {
+  reddit: 'Reddit',
+  hackernews: 'Hacker News',
+  polymarket: 'Polymarket',
+  'beacon-x': 'Beacon X',
+};
+
+function countBySource(signals: { source: string }[]): Record<string, number> {
+  return signals.reduce((acc, s) => {
+    acc[s.source] = (acc[s.source] ?? 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+}
+
 export default function GeneratePage() {
   return (
     <Suspense fallback={<div className="p-8 text-neutral-400">Loading…</div>}>
@@ -85,7 +99,7 @@ function GeneratePageInner() {
       const res = await fetch('/api/trends', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ topic: t }),
+        body: JSON.stringify({ topic: t, founderId }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message ?? 'Trends fetch failed');
@@ -244,8 +258,24 @@ function GeneratePageInner() {
 
               {trendBrief && (
                 <>
-                  <div className="mb-2 text-xs text-neutral-500">
-                    {trendBrief.raw_count} signals · {trendBrief.sources_used.join(' · ')}
+                  <div className="mb-2 flex flex-wrap items-center gap-1.5 text-xs">
+                    <span className="text-neutral-500">
+                      {trendBrief.raw_count} signals · grounded in:
+                    </span>
+                    {trendBrief.hivemind_grounded && (
+                      <span className="rounded border border-blue-900/50 bg-blue-950/40 px-2 py-0.5 text-blue-300">
+                        Hivemind project context
+                      </span>
+                    )}
+                    {Object.entries(countBySource(trendBrief.signals)).map(([src, count]) => (
+                      <span
+                        key={src}
+                        className="rounded border border-neutral-700 bg-neutral-800 px-2 py-0.5 text-neutral-300"
+                      >
+                        {SOURCE_LABELS[src] ?? src}{' '}
+                        <span className="text-neutral-500">({count})</span>
+                      </span>
+                    ))}
                   </div>
                   {trendBrief.signals.length > 0 && (
                     <details className="mb-3">
