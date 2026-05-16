@@ -196,12 +196,20 @@ Be specific. Reference the gap analysis directly.`;
 
 // ─── Draft pillar (uses style guide + brief via conversationId) ──
 
+// Hivemind enforces an 8000-char cap on `text`. The styleGuide is the biggest
+// variable input — well-filled voice.md profiles can run 8-10K chars. Cap to
+// 5500 to leave headroom for the template + brief reference context.
+function trimStyleGuide(guide: string, maxChars = 5500): string {
+  if (guide.length <= maxChars) return guide;
+  return guide.slice(0, maxChars) + '\n\n[...style guide truncated to fit chat cap]';
+}
+
 export function draftPillarPrompt(styleGuide: string): string {
   return `Write the pillar post now, following the brief just produced.
 
 VOICE PROFILE (follow EXACTLY — match sentence rhythm, hook patterns, anti-patterns, lexical fingerprint):
 
-${styleGuide}
+${trimStyleGuide(styleGuide)}
 
 REQUIREMENTS:
 - 600-900 words
