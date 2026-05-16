@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import type { PipelineEvent, PipelineStep } from '@/lib/types';
+import type { PipelineEvent, PipelineStep, TrendBrief } from '@/lib/types';
 
 const STEP_LABELS: Record<PipelineStep, string> = {
   voice_extraction: 'Voice extraction',
@@ -44,10 +44,15 @@ function GeneratePageInner() {
   const searchParams = useSearchParams();
   const founderId = searchParams.get('founderId') ?? '';
 
-  const [founder, setFounder] = useState<{ name: string } | null>(null);
+  const [founder, setFounder] = useState<{ name: string; niche?: string } | null>(null);
   const [signalBrief, setSignalBrief] = useState('');
-  const [topic, setTopic] = useState('');
   const [running, setRunning] = useState(false);
+
+  // Trends widget state
+  const [trendsTopic, setTrendsTopic] = useState('');
+  const [trendBrief, setTrendBrief] = useState<TrendBrief | null>(null);
+  const [trendsLoading, setTrendsLoading] = useState(false);
+  const [trendsError, setTrendsError] = useState<string | null>(null);
 
   const [stepStates, setStepStates] = useState<Record<string, StepState>>({});
   const [stepOutputs, setStepOutputs] = useState<Record<string, string>>({});
@@ -61,10 +66,37 @@ function GeneratePageInner() {
     fetch(`/api/founders?id=${founderId}`)
       .then((r) => r.json())
       .then((data) => {
-        if (data.founder) setFounder({ name: data.founder.name });
+        if (data.founder) {
+          setFounder({ name: data.founder.name, niche: data.founder.niche });
+          const initialTopic = data.founder.niche?.replace(/-/g, ' ') ?? 'ai marketing';
+          setTrendsTopic(initialTopic);
+          void fetchTrends(initialTopic);
+        }
       })
       .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [founderId]);
+
+  async function fetchTrends(t: string): Promise<void> {
+    if (!t.trim()) return;
+    setTrendsLoading(true);
+    setTrendsError(null);
+    try {
+      const res = await fetch('/api/trends', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ topic: t }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message ?? 'Trends fetch failed');
+      setTrendBrief(data.brief);
+      setSignalBrief(data.brief.brief); // pre-populate the editable brief
+    } catch (err) {
+      setTrendsError(err instanceof Error ? err.message : 'Fetch failed');
+    } finally {
+      setTrendsLoading(false);
+    }
+  }
 
   async function onGenerate() {
     if (!founderId || !signalBrief.trim()) return;
@@ -80,7 +112,7 @@ function GeneratePageInner() {
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ founderId, signalBrief, topic: topic || undefined }),
+        body: JSON.stringify({ founderId, signalBrief }),
         signal: abortRef.current.signal,
       });
 
@@ -168,31 +200,85 @@ function GeneratePageInner() {
           {/* LEFT: signal input + run */}
           <div className="space-y-6">
             <section>
-              <h2 className="mb-2 text-lg font-semibold">Signal brief</h2>
+              <h2 className="mb-2 text-lg font-semibold">Trends</h2>
               <p className="mb-3 text-sm text-neutral-400">
-                Paste the output from <code className="bg-neutral-800 px-1 rounded">/last30days</code> for the topic you're generating around.
-                Multi-platform synthesis: Reddit, X, YouTube, Polymarket, HN.
+                Auto-fetched from Reddit, Hacker News, and Polymarket — last 30 days.
+                Edit the brief below before generation if you want to refine the angle.
               </p>
-              <textarea
-                value={signalBrief}
-                onChange={(e) => setSignalBrief(e.target.value)}
-                placeholder="Paste last30days brief here..."
-                rows={14}
-                className="w-full rounded-md border border-neutral-800 bg-neutral-900 p-3 text-sm font-mono text-neutral-200"
-              />
-            </section>
 
-            <section>
-              <label className="block text-sm font-medium text-neutral-300 mb-1.5">
-                Topic (optional)
-              </label>
-              <input
-                type="text"
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-                placeholder="What angle should the pillar take?"
-                className="w-full rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-200"
-              />
+              <div className="mb-3 flex gap-2">
+                <input
+                  type="text"
+                  value={trendsTopic}
+                  onChange={(e) => setTrendsTopic(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      void fetchTrends(trendsTopic);
+                    }
+                  }}
+                  placeholder="ai marketing"
+                  className="flex-1 rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-200"
+                />
+                <button
+                  type="button"
+                  onClick={() => void fetchTrends(trendsTopic)}
+                  disabled={trendsLoading || !trendsTopic.trim()}
+                  className="rounded-md border border-neutral-700 px-4 py-2 text-sm hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {trendsLoading ? 'Fetching…' : 'Refresh'}
+                </button>
+              </div>
+
+              {trendsError && (
+                <div className="mb-3 rounded-md border border-red-900 bg-red-950/50 px-3 py-2 text-xs text-red-300">
+                  {trendsError}
+                </div>
+              )}
+
+              {trendsLoading && !trendBrief && (
+                <div className="rounded-md border border-neutral-800 bg-neutral-900 p-6 text-center text-sm text-neutral-400">
+                  Fetching from Reddit + Hacker News + Polymarket…
+                </div>
+              )}
+
+              {trendBrief && (
+                <>
+                  <div className="mb-2 text-xs text-neutral-500">
+                    {trendBrief.raw_count} signals · {trendBrief.sources_used.join(' · ')}
+                  </div>
+                  {trendBrief.signals.length > 0 && (
+                    <details className="mb-3">
+                      <summary className="cursor-pointer text-xs text-neutral-400 hover:text-neutral-200">
+                        Show top signals ({Math.min(trendBrief.signals.length, 10)} of {trendBrief.signals.length})
+                      </summary>
+                      <ul className="mt-2 space-y-1 text-xs">
+                        {trendBrief.signals.slice(0, 10).map((s, i) => (
+                          <li key={i} className="text-neutral-400">
+                            <span className="font-mono text-neutral-500">[{s.source}]</span>{' '}
+                            <a
+                              href={s.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-neutral-300 hover:underline"
+                            >
+                              {s.title}
+                            </a>{' '}
+                            <span className="text-neutral-600">— {s.engagement.toLocaleString()}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
+                  <textarea
+                    value={signalBrief}
+                    onChange={(e) => setSignalBrief(e.target.value)}
+                    rows={14}
+                    className="w-full rounded-md border border-neutral-800 bg-neutral-900 p-3 text-sm font-mono text-neutral-200"
+                    placeholder="Synthesized brief appears here — editable before generation."
+                  />
+                </>
+              )}
             </section>
 
             <button

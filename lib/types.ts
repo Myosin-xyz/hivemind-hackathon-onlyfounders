@@ -141,6 +141,30 @@ export type ContentOutput = {
 
 export type GenerationRequest = {
   founderId: string;
-  signalBrief: string;       // last30days output (pasted)
+  signalBrief: string;       // synthesized trend brief, or pasted text
   topic?: string;            // optional override
+};
+
+// ─── Trends (multi-platform discovery) ──────────────────────
+
+export type TrendSource = 'reddit' | 'hackernews' | 'polymarket';
+
+export type RawSignal = {
+  source: TrendSource;
+  title: string;
+  url: string;
+  author?: string;
+  engagement: number;        // upvotes + comments / points / volume / etc.
+  snippet?: string;
+  created_at: string;        // ISO
+  meta?: Record<string, unknown>;
+};
+
+export type TrendBrief = {
+  topic: string;
+  generated_at: string;
+  sources_used: TrendSource[];
+  raw_count: number;
+  signals: RawSignal[];      // top N sorted by engagement
+  brief: string;             // synthesized markdown
 };
