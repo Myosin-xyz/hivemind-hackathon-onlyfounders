@@ -126,6 +126,10 @@ function GeneratePageInner() {
   const [variationsComplete, setVariationsComplete] = useState(false);
   const running = draftRunning || variationsRunning;
 
+  // Step nav — three tabs. Tabs are always clickable; empty states guide.
+  type Step = 'trends_angle' | 'draft' | 'variations';
+  const [activeStep, setActiveStep] = useState<Step>('trends_angle');
+
   // Trends widget state
   const [trendsTopic, setTrendsTopic] = useState('');
   const [trendBrief, setTrendBrief] = useState<TrendBrief | null>(null);
@@ -293,6 +297,9 @@ function GeneratePageInner() {
 
     abortRef.current = new AbortController();
 
+    // Take user to Draft tab so they see the pipeline run in real time
+    setActiveStep('draft');
+
     try {
       await streamPipeline(
         '/api/generate/draft',
@@ -326,6 +333,9 @@ function GeneratePageInner() {
     });
 
     abortRef.current = new AbortController();
+
+    // Take user to Variations tab so they see the pipeline run
+    setActiveStep('variations');
 
     try {
       await streamPipeline(
@@ -390,10 +400,28 @@ function GeneratePageInner() {
     ...(variationStepsTriggered ? VARIATION_STEPS : []),
   ];
 
+  const anglePicked = !!(selectedAngle || customAngle.trim());
+
+  // Tab states for the nav bar
+  type TabState = 'current' | 'complete' | 'running' | 'pending';
+  function getTabState(step: Step): TabState {
+    if (activeStep === step) return 'current';
+    if (step === 'trends_angle' && anglePicked) return 'complete';
+    if (step === 'draft') {
+      if (draftRunning) return 'running';
+      if (draftComplete) return 'complete';
+    }
+    if (step === 'variations') {
+      if (variationsRunning) return 'running';
+      if (variationsComplete) return 'complete';
+    }
+    return 'pending';
+  }
+
   return (
     <main className="min-h-screen bg-neutral-950 text-neutral-100">
-      <div className="mx-auto max-w-6xl px-6 py-12">
-        <header className="mb-8">
+      <div className="mx-auto max-w-7xl px-6 py-8">
+        <header className="mb-6">
           <a href="/" className="text-sm text-neutral-400 hover:text-neutral-200">
             ← Home
           </a>
@@ -402,9 +430,57 @@ function GeneratePageInner() {
           </h1>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* LEFT: signal input + run */}
+        {/* Step nav */}
+        <nav className="mb-8 border-b border-neutral-800">
+          <ul className="flex gap-1">
+            {([
+              { step: 'trends_angle' as Step, num: 1, label: 'Trends + Angle' },
+              { step: 'draft' as Step, num: 2, label: 'Draft' },
+              { step: 'variations' as Step, num: 3, label: 'Variations' },
+            ]).map((t) => {
+              const tabState = getTabState(t.step);
+              return (
+                <li key={t.step}>
+                  <button
+                    type="button"
+                    onClick={() => setActiveStep(t.step)}
+                    className={`relative flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
+                      tabState === 'current'
+                        ? 'border-white text-white'
+                        : 'border-transparent text-neutral-500 hover:text-neutral-300'
+                    }`}
+                  >
+                    <span
+                      className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-mono ${
+                        tabState === 'current'
+                          ? 'bg-white text-black'
+                          : tabState === 'complete'
+                          ? 'bg-green-600 text-white'
+                          : tabState === 'running'
+                          ? 'bg-blue-600 text-white animate-pulse'
+                          : 'bg-neutral-800 text-neutral-500'
+                      }`}
+                    >
+                      {tabState === 'complete' ? '✓' : t.num}
+                    </span>
+                    <span>{t.label}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+
+        {errorMessage && (
+          <div className="mb-6 rounded-md border border-red-900 bg-red-950/50 px-4 py-3 text-sm text-red-300">
+            {errorMessage}
+          </div>
+        )}
+
+        {/* ─── Step 1: Trends + Angle (2-column) ─── */}
+        {activeStep === 'trends_angle' && (
           <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <section>
               <h2 className="mb-2 text-lg font-semibold">Trends</h2>
               <p className="mb-3 text-sm text-neutral-400">
@@ -615,164 +691,313 @@ function GeneratePageInner() {
                 )}
               </section>
             )}
-
-            {/* Stage controls — two-phase generation */}
-            {!draftComplete && !draftRunning && (
-              <button
-                onClick={onGenerateDraft}
-                disabled={
-                  running ||
-                  !signalBrief.trim() ||
-                  !(selectedAngle || customAngle.trim())
-                }
-                className="w-full rounded-md bg-white px-6 py-3 font-medium text-black hover:bg-neutral-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                title={
-                  !signalBrief.trim()
-                    ? 'Need a trends brief'
-                    : !(selectedAngle || customAngle.trim())
-                    ? 'Pick or type an angle first'
-                    : ''
-                }
-              >
-                Generate draft
-              </button>
-            )}
-
-            {draftRunning && (
-              <button
-                disabled
-                className="w-full rounded-md bg-neutral-700 px-6 py-3 font-medium text-neutral-300"
-              >
-                Generating draft… (~1-2 min)
-              </button>
-            )}
-
-            {draftComplete && !variationsRunning && !variationsComplete && (
-              <div className="space-y-2">
-                <button
-                  onClick={onGenerateVariations}
-                  className="w-full rounded-md bg-white px-6 py-3 font-medium text-black hover:bg-neutral-200"
-                >
-                  Generate variations →
-                </button>
-                <button
-                  onClick={onGenerateDraft}
-                  className="w-full rounded-md border border-neutral-700 px-6 py-2 text-sm text-neutral-300 hover:bg-neutral-800"
-                >
-                  ↻ Regenerate draft
-                </button>
-              </div>
-            )}
-
-            {variationsRunning && (
-              <button
-                disabled
-                className="w-full rounded-md bg-neutral-700 px-6 py-3 font-medium text-neutral-300"
-              >
-                Generating variations… (~1-2 min)
-              </button>
-            )}
-
-            {variationsComplete && (
-              <div className="space-y-2">
-                <div className="rounded-md border border-green-900/50 bg-green-950/20 px-4 py-3 text-sm text-green-300">
-                  ✓ Draft + 4 variations ready. Review on the right.
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={onGenerateVariations}
-                    className="flex-1 rounded-md border border-neutral-700 px-4 py-2 text-xs text-neutral-300 hover:bg-neutral-800"
-                  >
-                    ↻ Regenerate variations
-                  </button>
-                  <button
-                    onClick={onGenerateDraft}
-                    className="flex-1 rounded-md border border-neutral-700 px-4 py-2 text-xs text-neutral-300 hover:bg-neutral-800"
-                  >
-                    ↻ Regenerate draft
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {errorMessage && (
-              <div className="rounded-md border border-red-900 bg-red-950/50 px-4 py-3 text-sm text-red-300">
-                {errorMessage}
-              </div>
-            )}
-
-            <section>
-              <h3 className="mb-3 text-sm font-semibold text-neutral-300">Pipeline</h3>
-              <ul className="space-y-1.5">
-                {visiblePipelineSteps.map((step) => {
-                  const state = stepStates[step] ?? 'pending';
-                  return (
-                    <li
-                      key={step}
-                      onClick={() => stepOutputs[step] && setActiveTab(step)}
-                      className={`flex items-center gap-2 text-sm cursor-pointer ${
-                        stepOutputs[step] ? 'hover:bg-neutral-800/50' : ''
-                      } rounded px-2 py-1`}
-                    >
-                      <StateIcon state={state} />
-                      <span
-                        className={
-                          state === 'completed'
-                            ? 'text-neutral-200'
-                            : state === 'in_progress'
-                            ? 'text-blue-400'
-                            : state === 'failed'
-                            ? 'text-red-400'
-                            : 'text-neutral-500'
-                        }
-                      >
-                        {STEP_LABELS[step]}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-          </div>
-
-          {/* RIGHT: output viewer */}
-          <div>
-            <div className="sticky top-6">
-              <div className="mb-3 flex gap-1 flex-wrap">
-                {visibleOutputTabs.map((step) => (
-                  <button
-                    key={step}
-                    onClick={() => setActiveTab(step)}
-                    disabled={!stepOutputs[step]}
-                    className={`rounded-md px-3 py-1.5 text-xs ${
-                      activeTab === step
-                        ? 'bg-white text-black'
-                        : stepOutputs[step]
-                        ? 'border border-neutral-700 text-neutral-300 hover:bg-neutral-800'
-                        : 'border border-neutral-800 text-neutral-600 cursor-not-allowed'
-                    }`}
-                  >
-                    {STEP_LABELS[step]}
-                  </button>
-                ))}
-              </div>
-
-              <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-4 max-h-[80vh] overflow-y-auto">
-                {stepOutputs[activeTab] ? (
-                  <pre className="whitespace-pre-wrap font-mono text-sm text-neutral-200">
-                    {stepOutputs[activeTab]}
-                  </pre>
+            </div>
+            {/* Step 1 footer — selected angle + Continue */}
+            <div className="flex items-center justify-between gap-4 rounded-lg border border-neutral-800 bg-neutral-900 p-4">
+              <div className="min-w-0 flex-1">
+                {anglePicked ? (
+                  <>
+                    <div className="mb-1 text-xs text-neutral-500">Selected angle</div>
+                    <div className="truncate text-sm text-neutral-100">
+                      {selectedAngle || customAngle}
+                    </div>
+                  </>
                 ) : (
-                  <div className="text-center text-neutral-500 py-12">
-                    {running ? 'Waiting for this step…' : 'Run the pipeline to see output here.'}
+                  <div className="text-sm text-neutral-500">
+                    Pick an angle to continue
                   </div>
                 )}
               </div>
+              <button
+                type="button"
+                onClick={() => setActiveStep('draft')}
+                disabled={!anglePicked}
+                className="whitespace-nowrap rounded-md bg-white px-5 py-2.5 text-sm font-medium text-black hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Continue to Draft →
+              </button>
             </div>
           </div>
-        </div>
+        )}
+
+        {/* ─── Step 2: Draft ─── */}
+        {activeStep === 'draft' && (
+          <div className="space-y-6">
+            {!anglePicked ? (
+              <EmptyState
+                message="Pick an angle in step 1 first."
+                cta="← Back to Trends + Angle"
+                onCtaClick={() => setActiveStep('trends_angle')}
+              />
+            ) : (
+              <>
+                <div className="rounded-md border border-neutral-800 bg-neutral-900 p-3 text-xs">
+                  <span className="mr-2 text-neutral-500">Angle:</span>
+                  <span className="text-neutral-200">{selectedAngle || customAngle}</span>
+                </div>
+
+                {!draftComplete && !draftRunning && (
+                  <button
+                    type="button"
+                    onClick={onGenerateDraft}
+                    className="w-full rounded-md bg-white px-6 py-3 font-medium text-black hover:bg-neutral-200"
+                  >
+                    Generate draft
+                  </button>
+                )}
+                {draftRunning && (
+                  <button
+                    disabled
+                    className="w-full rounded-md bg-neutral-700 px-6 py-3 font-medium text-neutral-300"
+                  >
+                    Generating draft… (~1-2 min)
+                  </button>
+                )}
+                {draftComplete && !draftRunning && (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setActiveStep('variations')}
+                      className="flex-1 rounded-md bg-white px-6 py-3 font-medium text-black hover:bg-neutral-200"
+                    >
+                      Continue to Variations →
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onGenerateDraft}
+                      className="rounded-md border border-neutral-700 px-4 py-3 text-sm text-neutral-300 hover:bg-neutral-800"
+                    >
+                      ↻ Regenerate
+                    </button>
+                  </div>
+                )}
+
+                {(draftRunning || draftComplete) && (
+                  <PipelineList
+                    steps={draftStepsForList}
+                    stepStates={stepStates}
+                    stepOutputs={stepOutputs}
+                    setActiveTab={setActiveTab}
+                  />
+                )}
+
+                {(draftRunning || draftComplete) && (
+                  <OutputViewer
+                    tabs={draftStepsForList}
+                    stepOutputs={stepOutputs}
+                    activeTab={activeTab}
+                    setActiveTab={setActiveTab}
+                    running={draftRunning}
+                    emptyMessage={
+                      draftRunning
+                        ? 'Pipeline running… outputs stream in as each step completes.'
+                        : draftComplete
+                        ? 'Click a tab above to view that step\'s output.'
+                        : 'Click "Generate draft" to start.'
+                    }
+                  />
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ─── Step 3: Variations ─── */}
+        {activeStep === 'variations' && (
+          <div className="space-y-6">
+            {!draftComplete ? (
+              <EmptyState
+                message="Generate a draft in step 2 first."
+                cta="← Back to Draft"
+                onCtaClick={() => setActiveStep('draft')}
+              />
+            ) : (
+              <>
+                {!variationsComplete && !variationsRunning && (
+                  <button
+                    type="button"
+                    onClick={onGenerateVariations}
+                    className="w-full rounded-md bg-white px-6 py-3 font-medium text-black hover:bg-neutral-200"
+                  >
+                    Generate variations
+                  </button>
+                )}
+                {variationsRunning && (
+                  <button
+                    disabled
+                    className="w-full rounded-md bg-neutral-700 px-6 py-3 font-medium text-neutral-300"
+                  >
+                    Generating variations… (~1-2 min)
+                  </button>
+                )}
+                {variationsComplete && !variationsRunning && (
+                  <div className="space-y-2">
+                    <div className="rounded-md border border-green-900/50 bg-green-950/20 px-4 py-3 text-sm text-green-300">
+                      ✓ All 4 variations ready. Click a tab below to view.
+                    </div>
+                    <button
+                      type="button"
+                      onClick={onGenerateVariations}
+                      className="rounded-md border border-neutral-700 px-4 py-2 text-sm text-neutral-300 hover:bg-neutral-800"
+                    >
+                      ↻ Regenerate variations
+                    </button>
+                  </div>
+                )}
+
+                {(variationsRunning || variationsComplete) && (
+                  <PipelineList
+                    steps={VARIATION_STEPS}
+                    stepStates={stepStates}
+                    stepOutputs={stepOutputs}
+                    setActiveTab={setActiveTab}
+                  />
+                )}
+
+                {(variationsRunning || variationsComplete) && (
+                  <OutputViewer
+                    tabs={VARIATION_STEPS}
+                    stepOutputs={stepOutputs}
+                    activeTab={activeTab}
+                    setActiveTab={setActiveTab}
+                    running={variationsRunning}
+                    emptyMessage={
+                      variationsRunning
+                        ? 'Generating each variation in sequence…'
+                        : variationsComplete
+                        ? 'Click a tab above to view that variation.'
+                        : 'Click "Generate variations" to start.'
+                    }
+                  />
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
     </main>
+  );
+}
+
+function EmptyState({
+  message,
+  cta,
+  onCtaClick,
+}: {
+  message: string;
+  cta: string;
+  onCtaClick: () => void;
+}) {
+  return (
+    <div className="rounded-lg border border-amber-900/50 bg-amber-950/20 p-6 text-center">
+      <p className="mb-3 text-sm text-amber-300">{message}</p>
+      <button
+        type="button"
+        onClick={onCtaClick}
+        className="rounded-md border border-amber-700 px-4 py-2 text-sm text-amber-200 hover:bg-amber-950/50"
+      >
+        {cta}
+      </button>
+    </div>
+  );
+}
+
+function PipelineList({
+  steps,
+  stepStates,
+  stepOutputs,
+  setActiveTab,
+}: {
+  steps: PipelineStep[];
+  stepStates: Record<string, StepState>;
+  stepOutputs: Record<string, string>;
+  setActiveTab: (s: PipelineStep) => void;
+}) {
+  return (
+    <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
+      <h3 className="mb-3 text-sm font-semibold text-neutral-300">Pipeline</h3>
+      <ul className="space-y-1.5">
+        {steps.map((step) => {
+          const state = stepStates[step] ?? 'pending';
+          return (
+            <li
+              key={step}
+              onClick={() => stepOutputs[step] && setActiveTab(step)}
+              className={`flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm ${
+                stepOutputs[step] ? 'hover:bg-neutral-800/50' : ''
+              }`}
+            >
+              <StateIcon state={state} />
+              <span
+                className={
+                  state === 'completed'
+                    ? 'text-neutral-200'
+                    : state === 'in_progress'
+                    ? 'text-blue-400'
+                    : state === 'failed'
+                    ? 'text-red-400'
+                    : 'text-neutral-500'
+                }
+              >
+                {STEP_LABELS[step]}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function OutputViewer({
+  tabs,
+  stepOutputs,
+  activeTab,
+  setActiveTab,
+  running,
+  emptyMessage,
+}: {
+  tabs: PipelineStep[];
+  stepOutputs: Record<string, string>;
+  activeTab: PipelineStep;
+  setActiveTab: (s: PipelineStep) => void;
+  running: boolean;
+  emptyMessage: string;
+}) {
+  const isActiveTabRelevant = tabs.includes(activeTab) && !!stepOutputs[activeTab];
+  return (
+    <div>
+      <div className="mb-2 flex flex-wrap gap-1">
+        {tabs.map((step) => (
+          <button
+            key={step}
+            type="button"
+            onClick={() => setActiveTab(step)}
+            disabled={!stepOutputs[step]}
+            className={`rounded-md px-3 py-1.5 text-xs ${
+              activeTab === step
+                ? 'bg-white text-black'
+                : stepOutputs[step]
+                ? 'border border-neutral-700 text-neutral-300 hover:bg-neutral-800'
+                : 'cursor-not-allowed border border-neutral-800 text-neutral-600'
+            }`}
+          >
+            {STEP_LABELS[step]}
+          </button>
+        ))}
+      </div>
+      <div className="max-h-[70vh] overflow-y-auto rounded-lg border border-neutral-800 bg-neutral-900 p-4">
+        {isActiveTabRelevant ? (
+          <pre className="whitespace-pre-wrap font-mono text-sm text-neutral-200">
+            {stepOutputs[activeTab]}
+          </pre>
+        ) : (
+          <div className="py-12 text-center text-sm text-neutral-500">
+            {running ? 'Waiting for this step…' : emptyMessage}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
