@@ -1021,107 +1021,142 @@ function OutputViewer({
   );
 }
 
+function BriefSection({
+  title,
+  count,
+  defaultOpen = true,
+  accent = 'neutral',
+  icon,
+  children,
+}: {
+  title: string;
+  count: number;
+  defaultOpen?: boolean;
+  accent?: 'neutral' | 'amber';
+  icon?: string;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const titleColor = accent === 'amber' ? 'text-amber-400' : 'text-neutral-400';
+
+  return (
+    <section>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={`mb-2 flex w-full items-center justify-between text-xs font-semibold uppercase tracking-wide ${titleColor} hover:opacity-80`}
+      >
+        <span className="flex items-center gap-1.5">
+          {icon && <span>{icon}</span>}
+          <span>{title}</span>
+          <span className="text-neutral-600 normal-case">· {count}</span>
+        </span>
+        <span className="text-neutral-500">{open ? '▾' : '▸'}</span>
+      </button>
+      {open && <div className="space-y-2">{children}</div>}
+    </section>
+  );
+}
+
 function BriefRenderer({ parsed }: { parsed: NonNullable<ReturnType<typeof parseTrendBrief>> }) {
   return (
     <div className="space-y-5">
       {parsed.topConversations.length > 0 && (
-        <section>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">
-            Top conversations
-          </h3>
-          <div className="space-y-2">
-            {parsed.topConversations.map((c, i) => (
-              <article
-                key={i}
-                className="rounded-lg border border-neutral-800 bg-neutral-900 p-3"
-              >
-                <div className="mb-1 flex flex-wrap items-center gap-2 text-[10px]">
-                  {c.source && (
-                    <span className="rounded bg-neutral-800 px-1.5 py-0.5 font-mono text-neutral-400">
-                      {c.source}
-                    </span>
-                  )}
-                  {typeof c.engagement === 'number' && (
-                    <span className="text-neutral-500">
-                      {c.engagement.toLocaleString()} engagement
-                    </span>
-                  )}
-                  {typeof c.citationRef === 'number' && (
-                    <span className="ml-auto font-mono text-neutral-600">
-                      [{c.citationRef}]
-                    </span>
-                  )}
-                </div>
-                <h4 className="mb-1.5 text-sm font-medium text-neutral-100">
-                  {c.title}
-                </h4>
-                {c.body && (
-                  <p className="mb-2 text-xs leading-relaxed text-neutral-400">
-                    {c.body.replace(/\[\d+\]\.?\s*$/, '').trim()}
-                  </p>
+        <BriefSection
+          title="Top conversations"
+          count={parsed.topConversations.length}
+          defaultOpen={false}
+        >
+          {parsed.topConversations.map((c, i) => (
+            <article
+              key={i}
+              className="rounded-lg border border-neutral-800 bg-neutral-900 p-3"
+            >
+              <div className="mb-1 flex flex-wrap items-center gap-2 text-[10px]">
+                {c.source && (
+                  <span className="rounded bg-neutral-800 px-1.5 py-0.5 font-mono text-neutral-400">
+                    {c.source}
+                  </span>
                 )}
-                {c.quote && (
-                  <blockquote className="border-l-2 border-neutral-700 pl-2 text-xs italic text-neutral-300">
-                    “{c.quote}”
-                  </blockquote>
+                {typeof c.engagement === 'number' && (
+                  <span className="text-neutral-500">
+                    {c.engagement.toLocaleString()} engagement
+                  </span>
                 )}
-              </article>
-            ))}
-          </div>
-        </section>
+                {typeof c.citationRef === 'number' && (
+                  <span className="ml-auto font-mono text-neutral-600">
+                    [{c.citationRef}]
+                  </span>
+                )}
+              </div>
+              <h4 className="mb-1.5 text-sm font-medium text-neutral-100">
+                {c.title}
+              </h4>
+              {c.body && (
+                <p className="mb-2 text-xs leading-relaxed text-neutral-400">
+                  {c.body.replace(/\[\d+\]\.?\s*$/, '').trim()}
+                </p>
+              )}
+              {c.quote && (
+                <blockquote className="border-l-2 border-neutral-700 pl-2 text-xs italic text-neutral-300">
+                  “{c.quote}”
+                </blockquote>
+              )}
+            </article>
+          ))}
+        </BriefSection>
       )}
 
       {parsed.patterns.length > 0 && (
-        <section>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">
-            Patterns observed
-          </h3>
-          <div className="space-y-2">
-            {parsed.patterns.map((p) => (
-              <article
-                key={p.number}
-                className="rounded-lg border border-neutral-800 bg-neutral-900 p-3"
-              >
-                <h4 className="mb-1.5 flex items-baseline gap-2 text-sm font-medium text-neutral-100">
-                  <span className="font-mono text-xs text-neutral-500">
-                    {p.number}.
-                  </span>
-                  <span>{p.title}</span>
-                </h4>
-                <p className="text-xs leading-relaxed text-neutral-400 whitespace-pre-wrap">
-                  {p.body}
-                </p>
-              </article>
-            ))}
-          </div>
-        </section>
+        <BriefSection
+          title="Patterns observed"
+          count={parsed.patterns.length}
+          defaultOpen={true}
+        >
+          {parsed.patterns.map((p) => (
+            <article
+              key={p.number}
+              className="rounded-lg border border-neutral-800 bg-neutral-900 p-3"
+            >
+              <h4 className="mb-1.5 flex items-baseline gap-2 text-sm font-medium text-neutral-100">
+                <span className="font-mono text-xs text-neutral-500">
+                  {p.number}.
+                </span>
+                <span>{p.title}</span>
+              </h4>
+              <p className="text-xs leading-relaxed text-neutral-400 whitespace-pre-wrap">
+                {p.body}
+              </p>
+            </article>
+          ))}
+        </BriefSection>
       )}
 
       {parsed.whitespace.length > 0 && (
-        <section>
-          <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-amber-400">
-            <span>✨</span>
-            <span>Whitespace</span>
-          </h3>
-          <div className="space-y-2">
-            {parsed.whitespace.map((w) => (
-              <article
-                key={w.number}
-                className="rounded-lg border border-amber-900/40 bg-amber-950/10 p-3"
-              >
-                <h4 className="mb-1.5 flex items-baseline gap-2 text-sm font-medium text-amber-100">
-                  <span className="font-mono text-xs text-amber-500/70">
-                    {w.number}.
-                  </span>
-                  <span>{w.title}</span>
-                </h4>
-                <p className="text-xs leading-relaxed text-amber-200/80 whitespace-pre-wrap">
-                  {w.body}
-                </p>
-              </article>
-            ))}
-          </div>
-        </section>
+        <BriefSection
+          title="Whitespace"
+          count={parsed.whitespace.length}
+          defaultOpen={true}
+          accent="amber"
+          icon="✨"
+        >
+          {parsed.whitespace.map((w) => (
+            <article
+              key={w.number}
+              className="rounded-lg border border-amber-900/40 bg-amber-950/10 p-3"
+            >
+              <h4 className="mb-1.5 flex items-baseline gap-2 text-sm font-medium text-amber-100">
+                <span className="font-mono text-xs text-amber-500/70">
+                  {w.number}.
+                </span>
+                <span>{w.title}</span>
+              </h4>
+              <p className="text-xs leading-relaxed text-amber-200/80 whitespace-pre-wrap">
+                {w.body}
+              </p>
+            </article>
+          ))}
+        </BriefSection>
       )}
 
       {parsed.weakAssumption && (
