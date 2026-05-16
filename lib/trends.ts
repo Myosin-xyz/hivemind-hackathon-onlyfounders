@@ -187,6 +187,24 @@ async function fetchBeaconX(niche: string): Promise<RawSignal[]> {
 
 // ─── Synthesis (Claude rank + brief) ────────────────────────
 
+// Hivemind enforces an 8000-char cap on `text`. Tight signal trimming keeps
+// the prompt under that ceiling: 20 signals × ~250 chars compact = ~5K + template.
+function compactSignalsForPrompt(signals: RawSignal[]) {
+  return signals
+    .slice()
+    .sort((a, b) => b.engagement - a.engagement)
+    .slice(0, 20)
+    .map((s, i) => ({
+      idx: i + 1,
+      source: s.source,
+      title: s.title.slice(0, 140),
+      author: s.author,
+      engagement: s.engagement,
+      snippet: s.snippet?.slice(0, 120),
+      created_at: s.created_at.slice(0, 10),
+    }));
+}
+
 async function synthesizeTrends(
   signals: RawSignal[],
   topic: string,
@@ -195,21 +213,7 @@ async function synthesizeTrends(
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) throw new Error('ANTHROPIC_API_KEY not configured');
 
-  // Sort + cap signals for the prompt. Top 40 by engagement is enough context.
-  const compact = signals
-    .slice()
-    .sort((a, b) => b.engagement - a.engagement)
-    .slice(0, 40)
-    .map((s, i) => ({
-      idx: i + 1,
-      source: s.source,
-      title: s.title,
-      author: s.author,
-      engagement: s.engagement,
-      snippet: s.snippet?.slice(0, 200),
-      created_at: s.created_at.slice(0, 10),
-      url: s.url,
-    }));
+  const compact = compactSignalsForPrompt(signals);
 
   const prompt = `Synthesize a trend brief from these multi-platform signals.
 
@@ -218,7 +222,7 @@ LOOKBACK: last ${days} days
 SOURCES: Reddit, Hacker News, Polymarket
 
 RAW SIGNALS (sorted by engagement, top ${compact.length}):
-${JSON.stringify(compact, null, 2)}
+${JSON.stringify(compact)}
 
 Produce a structured markdown brief in this format:
 
@@ -270,20 +274,7 @@ async function synthesizeViaHivemind(
   days: number,
   conversationId: string,
 ): Promise<string> {
-  const compact = signals
-    .slice()
-    .sort((a, b) => b.engagement - a.engagement)
-    .slice(0, 40)
-    .map((s, i) => ({
-      idx: i + 1,
-      source: s.source,
-      title: s.title,
-      author: s.author,
-      engagement: s.engagement,
-      snippet: s.snippet?.slice(0, 200),
-      created_at: s.created_at.slice(0, 10),
-      url: s.url,
-    }));
+  const compact = compactSignalsForPrompt(signals);
 
   const prompt = `Synthesize a trend brief for this founder using the project context already loaded in our conversation.
 
@@ -291,7 +282,7 @@ TOPIC: ${topic}
 LOOKBACK: last ${days} days
 
 RAW SIGNALS (sorted by engagement across Reddit, HN, Polymarket, and Beacon X — top ${compact.length}):
-${JSON.stringify(compact, null, 2)}
+${JSON.stringify(compact)}
 
 Produce a structured markdown brief grounded in THIS founder's positioning:
 
