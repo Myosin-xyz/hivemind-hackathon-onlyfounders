@@ -98,10 +98,12 @@ export async function runOnboarding(
       return conversation.response;
     }
 
-    // Path 3: Beacon Twitter analyze (slower, async — only if explicit handle).
+    // Path 3: Beacon Twitter analyze. Uses the unified analyzeAndAwaitVoice
+    // helper which handles the cached-kickoff case where Beacon returns
+    // status='complete' immediately (and a sentinel analysis_id we shouldn't
+    // poll).
     if (input.twitterHandle && beacon.beaconConfigured) {
-      const kickoff = await beacon.analyzeVoice(input.twitterHandle);
-      const result = await beacon.pollVoiceAnalysis(kickoff.analysis_id);
+      const result = await beacon.analyzeAndAwaitVoice(input.twitterHandle);
       return result.profile?.style_guide ?? '(beacon voice analysis returned no style_guide)';
     }
 

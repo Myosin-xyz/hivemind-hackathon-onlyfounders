@@ -159,12 +159,28 @@ export function beaconSignalToRaw(p: BeaconSignalPost): RawSignal {
 
 // ─── Voice analysis (Twitter handle → voice profile) ───────
 
+// Kickoff response. Beacon may return either:
+//  - status='processing' (new analysis, poll the analysis_id)
+//  - status='complete'   (cached result, profile already included,
+//                         analysis_id can be a sentinel like 'va_cached')
+// We allow optional profile + error fields so both shapes typecheck.
 export type VoiceAnalyzeKickoff = {
   analysis_id: string;
   username: string;
   status: BeaconVoiceProfileStatus;
-  estimated_seconds: number;
-  poll_url: string;
+  estimated_seconds?: number;
+  poll_url?: string;
+  profile?: VoiceProfile;
+  error?: string;
+  message?: string;
+};
+
+type VoiceProfile = {
+  style_guide?: string;
+  formats?: Array<{ name: string; examples: string[] }>;
+  stylometry?: Record<string, unknown>;
+  completeness?: number;
+  confidence?: number;
 };
 
 export type VoiceAnalyzeStatus = {
@@ -172,13 +188,10 @@ export type VoiceAnalyzeStatus = {
   username: string;
   status: BeaconVoiceProfileStatus;
   // When status === 'complete', profile fields populate
-  profile?: {
-    style_guide?: string;
-    formats?: Array<{ name: string; examples: string[] }>;
-    stylometry?: Record<string, unknown>;
-    completeness?: number;
-    confidence?: number;
-  };
+  profile?: VoiceProfile;
+  // When status === 'failed', Beacon may include a reason
+  error?: string;
+  message?: string;
 };
 
 export async function analyzeVoice(
@@ -195,6 +208,38 @@ export async function getVoiceAnalysis(analysisId: string): Promise<VoiceAnalyze
   return request(`/api/voice/analyze/${analysisId}`);
 }
 
+function failureDetail(s: { error?: string; message?: string; username?: string }): string {
+  const handle = s.username ? `@${s.username.replace(/^@/, '')}` : 'unknown handle';
+  const detail = s.error ?? s.message ?? null;
+  return detail ? `${handle}: ${detail}` : handle;
+}
+
+// Kick off analysis + wait for result in one call. Handles the cached-result
+// case where Beacon returns status='complete' on the kickoff itself (sentinel
+// analysis_id like 'va_cached'), avoiding the spurious poll that 404s.
+export async function analyzeAndAwaitVoice(
+  username: string,
+  options: { force_refresh?: boolean; min_tweets?: number; intervalMs?: number; timeoutMs?: number } = {},
+): Promise<VoiceAnalyzeStatus> {
+  const kickoff = await analyzeVoice(username, {
+    force_refresh: options.force_refresh,
+    min_tweets: options.min_tweets,
+  });
+
+  // Cached / immediate result — Beacon returned the profile already.
+  if (kickoff.status === 'complete') {
+    return kickoff as VoiceAnalyzeStatus;
+  }
+  if (kickoff.status === 'failed') {
+    throw new Error(`Beacon voice analysis failed for ${failureDetail(kickoff)}`);
+  }
+
+  return pollVoiceAnalysis(kickoff.analysis_id, {
+    intervalMs: options.intervalMs,
+    timeoutMs: options.timeoutMs,
+  });
+}
+
 // Poll until voice analysis completes. Default: every 5s, max 5 min.
 export async function pollVoiceAnalysis(
   analysisId: string,
@@ -208,10 +253,10 @@ export async function pollVoiceAnalysis(
     const status = await getVoiceAnalysis(analysisId);
     if (status.status === 'complete') return status;
     if (status.status === 'failed') {
-      throw new Error(`Beacon voice analysis failed for ${analysisId}`);
+      throw new Error(`Beacon voice analysis failed for ${failureDetail(status)}`);
     }
     await new Promise((r) => setTimeout(r, interval));
   }
 
-  throw new Error(`Beacon voice analysis timed out for ${analysisId}`);
+  throw new Error(`Beacon voice analysis timed out for analysis ${analysisId}`);
 }
