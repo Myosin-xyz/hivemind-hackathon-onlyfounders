@@ -130,69 +130,52 @@ Example shape (follow exactly):
 // that angle. Otherwise it picks the highest-leverage angle from the gap
 // analysis on its own.
 export function briefPrompt(selectedAngle?: string): string {
-  if (selectedAngle) {
-    return `The angle for this pillar has been chosen:
+  const focusDisciplineHeader = selectedAngle
+    ? `The angle for this pillar has been chosen:
 
 > ${selectedAngle}
 
-Develop a detailed pillar post brief AROUND this angle. Use the gap analysis and signal brief already in our conversation history for grounding.
+Develop a brief that COMMITS to this angle as the SINGLE spine of the piece. Resist the temptation to layer in additional arguments — focus is the discipline. Use the gap analysis and trend brief in our conversation history for grounding.`
+    : `Based on the gap analysis just produced, pick the ONE highest-leverage angle and write a tight brief around it. Resist the temptation to combine multiple gaps into one piece — focus is the discipline.`;
 
-Output as markdown:
-
-## Angle
-[Restate the chosen angle as one sharp sentence]
-
-## Hook Style
-[provocative / insight / story / contrarian — what fits THIS angle best]
-
-## Three Key Arguments
-1. ...
-2. ...
-3. ...
-
-## Doctrine Connection
-[Which of the founder's named principles anchors this — reference the voice profile's doctrine section]
-
-## Asymmetric Move
-[What makes this NOT generic — the specific reframe or insight only this founder would make]
-
-## Format Fit
-[Long-form LinkedIn for the pillar. ~600-900 words. Brief reasoning.]
-
-## Unexpected Adjacent Frame
-[One unexpected adjacent-domain analogy or principle to weave in]
-
-Be specific to the chosen angle. Reference the gap analysis.`;
-  }
-
-  return `Based on the gap analysis just produced, write a detailed pillar post brief for this week.
+  return `${focusDisciplineHeader}
 
 Output as markdown:
 
 ## Angle
 [One sharp sentence — the specific take]
 
+## One-Sentence Summary
+[If a reader had to summarize the whole pillar in one sentence, what would it be? This is the gut check for focus. Every paragraph in the pillar must serve this summary or be cut.]
+
 ## Hook Style
-[provocative / insight / story / contrarian — pick one and justify in half a sentence]
+[provocative / insight / story / contrarian — what fits this angle best, and why in half a sentence]
 
-## Three Key Arguments
-1. ...
-2. ...
-3. ...
+## Central Argument (THE spine)
+[ONE argument that carries the piece. 2-3 sentences max. This is what every paragraph serves.]
 
-## Doctrine Connection
-[Which of the founder's named principles anchors this — reference the voice profile's doctrine section]
+## Two Supporting Beats (NOT a third argument)
+- Beat 1: [one-line evidence or example that supports the central argument]
+- Beat 2: [another one-line evidence or example]
+
+(If a third beat feels essential, you've smuggled in a second argument — strip it back.)
+
+## Primary Doctrine Principle (ONE)
+[Pick the ONE founder principle this pillar most depends on. Quote it or summarize it. Do not try to use all of them.]
 
 ## Asymmetric Move
-[What makes this NOT generic — the specific reframe or insight only this founder would make]
+[What makes this NOT generic — the specific reframe only this founder would make]
 
 ## Format Fit
-[Long-form LinkedIn for the pillar. ~600-900 words. Reasoning for length and platform.]
+[Long-form LinkedIn. 600-900 words target. Brief reasoning.]
 
-## Unexpected Adjacent Frame
-[One unexpected adjacent-domain analogy or principle to weave in for cross-domain resonance]
+## ONE Adjacent Frame (all the way through)
+[Pick ONE unexpected analogy or principle from another domain. Use it as the structural metaphor for the whole piece. Do NOT introduce a second analogy. If two are tempting, pick the more interesting one and commit.]
 
-Be specific. Reference the gap analysis directly.`;
+## Anti-Scope (what NOT to include)
+[List 1-2 angles or arguments that COULD be in this piece but would dilute the central argument. Specifying the cuts is as important as specifying the content.]
+
+Be specific. Reference the gap analysis directly. The brief's job is to constrain, not to enumerate possibilities.`;
 }
 
 // ─── Draft pillar (uses style guide + brief via conversationId) ──
@@ -231,17 +214,21 @@ Output the post directly. No preamble. No meta-commentary. Just the post.`;
 // ─── Revise pillar based on QC feedback ────────────────────
 
 // Takes the QC feedback (already in the conversation thread) and produces a
-// REVISED pillar that addresses the actionable fixes. The revised pillar
-// becomes the canonical source for the repurpose stage.
+// REVISED pillar that addresses the actionable fixes. CRITICAL: if QC flagged
+// focus discipline, the revise step must CUT material, not polish it.
+// The revised pillar becomes the canonical source for the repurpose stage.
 export function revisePillarPrompt(): string {
-  return `The QC step just produced feedback on the draft pillar (above in our conversation). Produce a REVISED version of the pillar that addresses every actionable fix.
+  return `The QC step just produced feedback on the draft pillar (above in our conversation). Produce a REVISED version that addresses every actionable fix — INCLUDING CUTS when QC flagged focus drift.
 
 Rules:
 - Apply every specific fix from the QC's "Specific Fixes Required" section
+- If QC flagged focus discipline failure: CUT the diluting material. Don't try to keep everything and polish around it. The revised piece should be SHORTER and SHARPER, not the same length with cleaner prose. A piece with one clean argument at 500 words beats a piece with three arguments at 900 words.
+- If QC flagged "stacked analogies": pick the stronger one, remove the other completely.
+- If QC flagged "competing arguments": pick the central one, reduce others to a sentence of context or cut entirely.
 - Preserve everything the QC marked PASS — don't fix what isn't broken
 - Keep the voice consistent with the voice profile loaded in this conversation
-- Keep the length comparable to the original (600-900 words)
-- Maintain the chosen angle and doctrine connection
+- Maintain the chosen angle and the primary doctrine principle
+- Target length: 500-900 words. Cuts are welcome. Length is not a goal.
 
 If the QC verdict was READY TO SHIP, output the original pillar unchanged.
 
@@ -249,7 +236,7 @@ Output ONLY the revised pillar text. No preamble. No QC commentary. No section h
 }
 
 export function qcPrompt(): string {
-  return `Apply a 7-lens quality check to the draft just produced. Flag specific lines or passages that fail any lens. Suggest concrete fixes.
+  return `Apply an 8-lens quality check to the draft just produced. Flag specific lines or passages that fail any lens. Suggest concrete fixes — including CUTS when the piece is trying to do too much.
 
 LENSES:
 
@@ -260,16 +247,25 @@ LENSES:
 5. **Asymmetric move** — does the post actually deliver the move, or just gesture at it?
 6. **Anti-AI-slop** — any of these AI tells: hedging, listicle bloat, generic transitions, "it's not just X, it's Y", "in today's [domain]"?
 7. **Specificity** — does it name specific things (people, products, numbers, events) or hide behind generalities?
+8. **Focus discipline** — can the entire piece be summarized in ONE sentence? If you can't write that sentence cleanly, the piece is trying to do too much. Does the post EARN its central argument, or does it smuggle in competing arguments / stack multiple analogies / try to land more than one doctrine principle? Flag specific paragraphs or sections to CUT (not polish) when scope creep is happening.
 
 Output as markdown:
+
+## One-Sentence Summary Test
+[Try to summarize the whole pillar in one sentence. If the piece has a clear spine, this lands cleanly. If it doesn't, name what's competing for the spine.]
 
 ## Pass/Fail per lens
 - Reader-first hook: PASS | FAIL — [one line]
 - Voice consistency: PASS | FAIL — [one line]
-- ...
+- Concretization: PASS | FAIL — [one line]
+- Doctrine integration: PASS | FAIL — [one line]
+- Asymmetric move: PASS | FAIL — [one line]
+- Anti-AI-slop: PASS | FAIL — [one line]
+- Specificity: PASS | FAIL — [one line]
+- Focus discipline: PASS | FAIL — [one line]
 
 ## Specific Fixes Required
-[For each FAIL, quote the problematic line and write the proposed replacement]
+[For each FAIL, quote the problematic line/paragraph and write the proposed replacement OR specify what to CUT entirely. Focus-discipline fails are usually cuts, not rewrites.]
 
 ## Verdict
 [READY TO SHIP | NEEDS REVISION | START OVER — with one-sentence reason]`;
