@@ -188,25 +188,47 @@ function parseTopConversations(text: string): ConversationItem[] {
   return items;
 }
 
-// Numbered items: try multiple format variations. The LLM drifts between:
-//   **1. Title.** Body...
-//   **1.** Title.\n\nBody...
-//   1. **Title.** Body...
-//   ### 1. Title\n\nBody...
-//   **1. Title**\nBody...
-// If everything fails, preserve unparseable substantial blocks as numbered
-// items so content is never silently dropped.
+// Numbered/bold items: try several strategies in order. Whichever yields
+// the most items wins. This lets a brief that uses `**Title.** body` (no
+// number prefix) parse just as cleanly as one that uses `**1. Title.** body`.
 function parseNumberedItems(text: string): NumberedItem[] {
   if (!text.trim()) return [];
 
+  const candidates: NumberedItem[][] = [
+    tryNumberedPatterns(text),
+    tryBoldHeadedPatterns(text),
+  ];
+
+  // Pick the strategy that yielded the most items
+  let best: NumberedItem[] = [];
+  for (const c of candidates) {
+    if (c.length > best.length) best = c;
+  }
+  if (best.length > 0) return best;
+
+  // Graceful degradation: preserve substantial text as one item rather than
+  // dropping it silently
+  if (text.length > 60) {
+    return [{
+      number: 1,
+      title: text.split('\n')[0].slice(0, 100) || '(content)',
+      body: text,
+    }];
+  }
+  return [];
+}
+
+// Strategy 1 — numbered items (the prompt's canonical format).
+//   **1. Title.** Body...    /    1. **Title** body    /    ### 1. Title \n body    etc.
+function tryNumberedPatterns(text: string): NumberedItem[] {
   const items: NumberedItem[] = [];
 
-  // Try several split boundaries in order of specificity
+  // Split boundaries to try
   const splitPatterns = [
-    /\n(?=\*\*\d+\.)/,           // **1. ...
-    /\n(?=\d+\.\s+\*\*)/,         // 1. **Title**
-    /\n(?=###\s+\d+)/,            // ### 1. Title
-    /\n\n(?=\*\*\d+)/,            // **1** (blank line before)
+    /\n(?=\*\*\d+\.)/,
+    /\n(?=\d+\.\s+\*\*)/,
+    /\n(?=###\s+\d+)/,
+    /\n\n(?=\*\*\d+)/,
   ];
 
   let blocks: string[] = [text];
@@ -217,19 +239,17 @@ function parseNumberedItems(text: string): NumberedItem[] {
     }
   }
 
-  // Per-block regex variants
   const matchPatterns: Array<{ re: RegExp; numIdx: number; titleIdx: number; bodyIdx: number }> = [
-    { re: /^\*\*(\d+)\.\s+([\s\S]+?)\.?\*\*\s*([\s\S]*)$/, numIdx: 1, titleIdx: 2, bodyIdx: 3 },     // **1. Title.** body
-    { re: /^\*\*(\d+)\.?\*\*\s+([^\n*]+?)\.?\s*\n+([\s\S]*)$/, numIdx: 1, titleIdx: 2, bodyIdx: 3 }, // **1.** Title \n body
-    { re: /^(\d+)\.\s+\*\*([^*]+?)\*\*\s*([\s\S]*)$/, numIdx: 1, titleIdx: 2, bodyIdx: 3 },          // 1. **Title** body
-    { re: /^###\s+(\d+)\.\s+([^\n]+?)\.?\s*\n+([\s\S]*)$/, numIdx: 1, titleIdx: 2, bodyIdx: 3 },     // ### 1. Title \n body
+    { re: /^\*\*(\d+)\.\s+([\s\S]+?)\.?\*\*\s*([\s\S]*)$/, numIdx: 1, titleIdx: 2, bodyIdx: 3 },
+    { re: /^\*\*(\d+)\.?\*\*\s+([^\n*]+?)\.?\s*\n+([\s\S]*)$/, numIdx: 1, titleIdx: 2, bodyIdx: 3 },
+    { re: /^(\d+)\.\s+\*\*([^*]+?)\*\*\s*([\s\S]*)$/, numIdx: 1, titleIdx: 2, bodyIdx: 3 },
+    { re: /^###\s+(\d+)\.\s+([^\n]+?)\.?\s*\n+([\s\S]*)$/, numIdx: 1, titleIdx: 2, bodyIdx: 3 },
   ];
 
   for (const rawBlock of blocks) {
     const block = rawBlock.trim();
     if (!block) continue;
 
-    let matched = false;
     for (const { re, numIdx, titleIdx, bodyIdx } of matchPatterns) {
       const m = block.match(re);
       if (m) {
@@ -238,20 +258,41 @@ function parseNumberedItems(text: string): NumberedItem[] {
           title: m[titleIdx].trim().replace(/\.$/, ''),
           body: m[bodyIdx].trim(),
         });
-        matched = true;
         break;
       }
     }
+  }
 
-    // Graceful degradation: preserve unmatched but substantial blocks
-    if (!matched && block.length > 60) {
-      const firstLine = block.split('\n')[0].replace(/^[\d.*\s]+/, '').trim();
-      items.push({
-        number: items.length + 1,
-        title: firstLine.slice(0, 100) || '(untitled)',
-        body: block,
-      });
-    }
+  return items;
+}
+
+// Strategy 2 — bold-headed paragraphs (LLM drops the number prefix).
+//   **Title sentence.** Body paragraph that follows...
+//
+//   **Next title sentence.** Body...
+//
+// Each item is a paragraph that starts with **bold** followed by body text.
+// Items get auto-assigned sequential numbers since the source has none.
+function tryBoldHeadedPatterns(text: string): NumberedItem[] {
+  const items: NumberedItem[] = [];
+  const paragraphs = text.split(/\n\n+/);
+
+  for (const rawPara of paragraphs) {
+    const p = rawPara.trim();
+    if (!p.startsWith('**')) continue;
+
+    // **Title.** body (the period inside the closing ** is common; allow either)
+    const m = p.match(/^\*\*([\s\S]+?)\.?\*\*\s*([\s\S]*)$/);
+    if (!m) continue;
+
+    // Skip if title looks like a numbered prefix (avoid double-matching numbered patterns)
+    if (/^\d+\.?\s/.test(m[1].trim())) continue;
+
+    items.push({
+      number: items.length + 1,
+      title: m[1].trim().replace(/\.$/, ''),
+      body: m[2].trim(),
+    });
   }
 
   return items;
