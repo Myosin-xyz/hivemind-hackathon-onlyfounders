@@ -1,33 +1,45 @@
 @import "tailwindcss";
 
 /* ─── Brand tokens ───────────────────────────────────────── */
-/* Source of truth: only-founders-brand.md */
+/* Source of truth: only-founders-brand.md                     */
+/*                                                              */
+/* Defined inside @theme so Tailwind generates utilities like   */
+/* bg-of-blue, text-of-pink, border-of-orange/30, etc., AND     */
+/* exposes them on :root as --color-* CSS custom properties     */
+/* that custom CSS rules can reference (e.g. the focus ring).   */
+/*                                                              */
+/* Earlier setup used `:root` + `@theme inline { var(--color-X) }` */
+/* with matching names — that caused a self-referential loop    */
+/* (--color-of-X resolved to var(--color-of-X)) and broke every */
+/* brand color utility silently. Keeping definitions inside     */
+/* @theme avoids the loop.                                      */
+
+@theme {
+  --color-of-black:      #080808;
+  --color-of-blue:       #1A6DFF;
+  --color-of-pink:       #FF3D7F;
+  --color-of-off-white:  #F4F2EC;
+  --color-of-white:      #FFFFFF;
+  --color-of-mid:        rgba(255, 255, 255, 0.12);
+
+  --color-of-green:      #06D6A0;
+  --color-of-orange:     #FF6B35;
+  --color-of-gold:       #FFD166;
+
+  --color-hm-lime:       #B8C83A;
+  --color-hm-magenta:    #C800AA;
+  --color-hm-asterisk:   #C966FF;
+  --color-hm-bg:         #0D0D0D;
+
+  --font-sans:    var(--font-dm-sans);
+  --font-mono:    var(--font-dm-mono);
+  --font-display: var(--font-syne);
+}
 
 :root {
-  /* Core palette */
-  --color-of-black:        #080808;
-  --color-of-blue:         #1A6DFF;
-  --color-of-pink:         #FF3D7F;
-  --color-of-off-white:    #F4F2EC;
-  --color-of-white:        #FFFFFF;
-  --color-of-mid:          rgba(255, 255, 255, 0.12);
+  --background: #080808;
+  --foreground: #FFFFFF;
 
-  /* Semantic accents */
-  --color-of-green:        #06D6A0;
-  --color-of-orange:       #FF6B35;
-  --color-of-gold:         #FFD166;
-
-  /* Hivemind palette (eye mark only) */
-  --color-hm-lime:         #B8C83A;
-  --color-hm-magenta:      #C800AA;
-  --color-hm-asterisk:     #C966FF;
-  --color-hm-bg:           #0D0D0D;
-
-  /* Background + foreground for body */
-  --background:            var(--color-of-black);
-  --foreground:            var(--color-of-white);
-
-  /* Spacing scale */
   --space-xs:   8px;
   --space-sm:  16px;
   --space-md:  24px;
@@ -35,37 +47,10 @@
   --space-xl:  96px;
   --space-2xl: 160px;
 
-  /* Radii */
-  --radius-sm:   6px;
-  --radius-md:  10px;
-  --radius-lg:  14px;
+  --radius-sm:    6px;
+  --radius-md:   10px;
+  --radius-lg:   14px;
   --radius-pill: 999px;
-}
-
-/* ─── Tailwind v4 theme integration ──────────────────────── */
-/* Surfaces brand tokens as Tailwind utilities: */
-/*   bg-of-black, text-of-pink, font-display, font-mono, font-sans, etc. */
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-
-  --color-of-black:      var(--color-of-black);
-  --color-of-blue:       var(--color-of-blue);
-  --color-of-pink:       var(--color-of-pink);
-  --color-of-off-white:  var(--color-of-off-white);
-  --color-of-white:      var(--color-of-white);
-  --color-of-mid:        var(--color-of-mid);
-  --color-of-green:      var(--color-of-green);
-  --color-of-orange:     var(--color-of-orange);
-  --color-of-gold:       var(--color-of-gold);
-  --color-hm-lime:       var(--color-hm-lime);
-  --color-hm-magenta:    var(--color-hm-magenta);
-  --color-hm-asterisk:   var(--color-hm-asterisk);
-
-  --font-sans:    var(--font-dm-sans);
-  --font-mono:    var(--font-dm-mono);
-  --font-display: var(--font-syne);
 }
 
 /* ─── Base body ──────────────────────────────────────────── */
@@ -80,7 +65,6 @@ pre, code, kbd, samp, .font-mono {
   font-family: var(--font-dm-mono), 'Courier New', monospace;
 }
 
-/* Display font for hero / wordmark / monument numbers */
 .font-display {
   font-family: var(--font-syne), 'Impact', sans-serif;
   letter-spacing: -0.03em;
