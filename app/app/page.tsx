@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { listFounders } from '@/lib/store';
 import { Wordmark } from '../_brand/Wordmark';
+import { DeleteFounderButton } from './DeleteFounderButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,7 +65,7 @@ export default function AppHome() {
                       )}
                     </div>
                   </div>
-                  <div className="flex shrink-0 gap-2">
+                  <div className="flex shrink-0 items-center gap-2">
                     <Link
                       href={`/founder/${f.id}`}
                       className="rounded-full border border-white/12 px-3 py-1.5 text-xs font-medium uppercase tracking-wider text-white/60 transition-colors hover:border-white/30 hover:text-white"
@@ -78,6 +79,7 @@ export default function AppHome() {
                       Run the pipeline
                       <span aria-hidden className="transition-transform group-hover:translate-x-0.5">→</span>
                     </Link>
+                    <DeleteFounderButton founderId={f.id} founderName={f.name} />
                   </div>
                 </li>
               ))}
