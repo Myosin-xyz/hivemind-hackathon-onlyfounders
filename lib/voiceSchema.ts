@@ -52,7 +52,12 @@ export function fillSchema(founderName: string): string {
 // Parse the "Core POVs (Doctrine)" section out of a voice.md / style guide.
 // Returns the body of that section as markdown bullet list, or null if not found
 // or empty / template-only.
-export function parseDoctrineFromVoiceMd(content: string): string | null {
+//
+// Tolerates non-string input (returns null) — voice sources occasionally return
+// the style_guide as an object (or undefined) when an upstream provider
+// misbehaves, and doctrine auto-extraction should never crash onboarding.
+export function parseDoctrineFromVoiceMd(content: unknown): string | null {
+  if (typeof content !== 'string' || content.length === 0) return null;
   // Match "## Core POVs" (with optional " (Doctrine)") and capture body
   // until the next H2 or end of string.
   const match = content.match(/##\s+Core POVs[^\n]*\n([\s\S]+?)(?=\n##\s+|\n*$)/i);

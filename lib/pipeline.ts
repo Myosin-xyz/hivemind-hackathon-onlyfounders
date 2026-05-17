@@ -102,9 +102,22 @@ export async function runOnboarding(
     // helper which handles the cached-kickoff case where Beacon returns
     // status='complete' immediately (and a sentinel analysis_id we shouldn't
     // poll).
+    //
+    // Defensive: Beacon's profile.style_guide should be a markdown string,
+    // but we've seen cached responses where it's missing or wrapped in an
+    // object. If we can't get a usable string, throw a clear error instead
+    // of passing a non-string downstream (where parseDoctrineFromVoiceMd
+    // would explode with "content.match is not a function").
     if (input.twitterHandle && beacon.beaconConfigured) {
       const result = await beacon.analyzeAndAwaitVoice(input.twitterHandle);
-      return result.profile?.style_guide ?? '(beacon voice analysis returned no style_guide)';
+      const styleGuide = result.profile?.style_guide;
+      if (typeof styleGuide !== 'string' || styleGuide.trim().length === 0) {
+        throw new Error(
+          `Beacon returned no usable style_guide for @${input.twitterHandle.replace(/^@/, '')}. ` +
+          `Try a different handle, paste writing samples, or upload voice.md instead.`,
+        );
+      }
+      return styleGuide;
     }
 
     throw new Error('No voice source provided — need voiceMd, samples, or twitterHandle');
