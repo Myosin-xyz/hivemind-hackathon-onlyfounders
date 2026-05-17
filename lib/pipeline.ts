@@ -108,11 +108,14 @@ export async function runOnboarding(
     throw new Error('No voice source provided — need voiceMd, samples, or twitterHandle');
   });
 
-  // Start a project-scoped conversation the generation pipeline will reuse.
+  // Anchor conversation tied to the project. Not the writing thread (that's
+  // created fresh per draft cycle in runDraftStage). Trends synthesis reuses
+  // this conversationId for project-grounded chat calls, which also run with
+  // genius-strategist — keeping personas aligned across the thread.
   const conversation = await hivemind.startConversation(
     projectId,
-    `This conversation will produce founder-led content for ${input.name}. Voice profile and project context are loaded. Subsequent messages will run the gap analysis → brief → draft → QC → repurpose pipeline.`,
-    'general-assistant',
+    `Anchor conversation for ${input.name}. Project context and voice profile loaded. This thread will be used by trend-signal synthesis for project-grounded interpretation. Writing happens in fresh per-cycle threads.`,
+    'genius-strategist',
   );
 
   return {
@@ -180,10 +183,14 @@ ${request.angle ?? '(no angle pre-selected; brief step will pick one)'}
 
 Subsequent messages will run: brief → draft → QC → revise → repurpose.`;
 
+  // Seed the fresh draft-cycle conversation with ghostwriter. The dominant
+  // work in this thread is writing (draft + revise + 4 variations all run
+  // as ghostwriter), so anchoring the thread to ghostwriter from message 1
+  // keeps the persona consistent with how the memory will be used.
   const newConv = await hivemind.startConversation(
     founder.hivemindProjectId!,
     setupMessage,
-    'general-assistant',
+    'ghostwriter',
   );
 
   const draftConversationId = newConv.conversation_id ?? founder.conversationId!;
@@ -237,12 +244,16 @@ Subsequent messages will run: brief → draft → QC → revise → repurpose.`;
     return res.response;
   });
 
-  // Step: QC.
+  // Step: QC. The 8 lenses (voice consistency, anti-AI-slop, focus discipline,
+  // doctrine integration, asymmetric move, etc.) are editorial + strategic
+  // review, not launch planning. Strategist plays editor to the ghostwriter's
+  // draft — a natural writer/reviewer split, and a different persona than the
+  // one that wrote, which avoids self-confirming review.
   results.qc = await runStep('qc', callbacks, async () => {
     const res = await hivemind.appendToConversation(
       draftConversationId,
       prompts.qcPrompt(),
-      'gtm-architect',
+      'genius-strategist',
     );
     return res.response;
   });

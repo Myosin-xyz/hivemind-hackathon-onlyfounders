@@ -36,11 +36,14 @@ export type FounderProfile = {
 
 // ─── Hivemind API ───────────────────────────────────────────
 
+// The 4th persona Hivemind exposes — `general-assistant` — is the catch-all
+// the plugin guide itself recommends omitting. We don't route through it.
+// `gtm-architect` is still typed for future use (launch planning / channel
+// strategy is a natural extension) but currently unused in the pipeline.
 export type HivemindPersona =
   | 'ghostwriter'
   | 'gtm-architect'
-  | 'genius-strategist'
-  | 'general-assistant';
+  | 'genius-strategist';
 
 export type HivemindProject = {
   id: string;
