@@ -29,23 +29,32 @@ export type GapAnalysisInput = {
 };
 
 export function gapAnalysisPrompt(input: GapAnalysisInput): string {
+  // Niche pattern block — capped tight to stay under the 8000-char limit
   const patternsBlock = input.nichePatterns?.length
     ? `\nNICHE PATTERN BASELINE (Beacon, last 30 days):
 ${input.nichePatterns
-  .slice(0, 15)
+  .slice(0, 8)
   .map(
     (p) =>
-      `- ${p.hook_type} hook by @${p.author}: viral ${p.viral_score.toFixed(0)}, trigger: ${p.psychological_trigger}\n  "${p.text.slice(0, 200)}"`,
+      `- ${p.hook_type} hook by @${p.author}: viral ${p.viral_score.toFixed(0)}, trigger: ${p.psychological_trigger}\n  "${p.text.slice(0, 120)}"`,
   )
   .join('\n')}`
-    : '\n(no niche pattern data available for this run)';
-
-  const obsessionsBlock = input.founderObsessions?.length
-    ? `\nFOUNDER'S OBSESSIONS (where they have proven authority):
-${input.founderObsessions.join(', ')}`
     : '';
 
-  return `You are a strategic gap miner. Identify 3-5 specific gaps where ${input.founderName} is narratively absent or under-leveraged in their space.
+  // Recent posts — capped to 3 posts × 500 chars each to stay under the
+  // 8000-char Hivemind text limit. Founder's full recent corpus isn't needed
+  // for gap analysis; representative samples are enough.
+  const recentPostsBlock = input.recentPosts?.length
+    ? `\nFOUNDER'S RECENT CONTENT (${Math.min(input.recentPosts.length, 3)} of ${input.recentPosts.length} most recent pillar posts):
+${input.recentPosts
+  .slice(0, 3)
+  .map((p, i) => `[Post ${i + 1}]\n${p.slice(0, 500)}${p.length > 500 ? '…' : ''}`)
+  .join('\n\n')}`
+    : '\n(no recent posts on file — base gap analysis on project context + trend brief)';
+
+  // The trend brief is already in our conversation history from /api/trends —
+  // no need to re-include it (would push us past the 8000-char cap).
+  return `You are a strategic gap miner. Use the trend brief I just produced earlier in our conversation. Identify 3-5 specific gaps where ${input.founderName} is narratively absent or under-leveraged in their space.
 
 CATEGORIES: topic | format | timing | engagement_pattern
 
@@ -55,7 +64,7 @@ For each gap produce:
 - suggested_action: IMPERATIVE, executable this week (e.g., "Run a Thu 19:00 UTC thread on X with screenshot+link format")
 - evidence: cite one of the founder's past posts proving they CAN execute this
 
-Output as markdown with this structure:
+Output as markdown:
 
 ## Headline
 [One-line punch summarizing the strategic state]
@@ -72,22 +81,14 @@ Output as markdown with this structure:
 - **Evidence:** [excerpt from founder's past post showing they can execute]
 
 [... repeat for 3-5 gaps total]
-
-INPUTS:
-
-FOUNDER'S RECENT CONTENT (last 30 days, ${input.recentPosts.length} pillar posts):
-${input.recentPosts.map((p, i) => `[Post ${i + 1}]\n${p}`).join('\n\n')}
-
-BROADER CONVERSATION SIGNAL (multi-platform, last 30 days):
-${input.signalBrief}
+${recentPostsBlock}
 ${patternsBlock}
-${obsessionsBlock}
 
 RULES:
-- No generic advice. Every gap must reference signal data or niche patterns directly.
+- No generic advice. Reference the trend brief signals or niche patterns directly.
 - Every suggested_action must be executable this week.
 - Evidence must come from the founder's recent posts above — quote actual phrases.
-- Be specific. Reference specific trends or pattern data by name.`;
+- Be specific.`;
 }
 
 // ─── Angle proposals (runs after gap_analysis in conversation) ──
