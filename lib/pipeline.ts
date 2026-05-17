@@ -4,6 +4,7 @@
 import * as hivemind from './hivemind';
 import * as beacon from './beacon';
 import * as prompts from './prompts';
+import { updateFounder } from './store';
 import type {
   FounderProfile,
   PipelineEvent,
@@ -146,6 +147,52 @@ export async function runDraftStage(
 ): Promise<Partial<Record<PipelineStep, string>>> {
   assertFounderReady(founder);
 
+  // CRITICAL: create a fresh conversation per draft cycle.
+  //
+  // Previously we reused founder.conversationId across every generation. The
+  // conversation accumulated prior briefs/drafts/QCs/revises, and Hivemind
+  // started caching against the most-recent draft instead of re-generating
+  // from the new brief. Result: a new angle would produce the OLD draft,
+  // because the LLM saw a recent draft in memory and defaulted to it.
+  //
+  // Each draft cycle now gets its own conversation, seeded with the voice
+  // profile + signal brief + picked angle. Brief/draft/QC/revise + variations
+  // all run inside this fresh thread. Onboarding's conversationId is no
+  // longer the writing thread — it's just the anchor where voice was set up.
+
+  const trimmedStyleGuide = founder.styleGuide!.length > 4500
+    ? founder.styleGuide!.slice(0, 4500) + '\n\n[...style guide truncated]'
+    : founder.styleGuide!;
+
+  const setupMessage = `Pillar generation cycle for ${founder.name}.
+
+VOICE PROFILE (use for all writing in this thread):
+
+${trimmedStyleGuide}
+
+SIGNAL BRIEF (the trend context, last 30 days, for grounding — do NOT treat as a writing prompt):
+
+${request.signalBrief.slice(0, 2500)}${request.signalBrief.length > 2500 ? '\n[...]' : ''}
+
+CHOSEN ANGLE (the spine — the pillar argues exactly THIS, anchored to the corresponding signal):
+
+${request.angle ?? '(no angle pre-selected; brief step will pick one)'}
+
+Subsequent messages will run: brief → draft → QC → revise → repurpose.`;
+
+  const newConv = await hivemind.startConversation(
+    founder.hivemindProjectId!,
+    setupMessage,
+    'general-assistant',
+  );
+
+  const draftConversationId = newConv.conversation_id ?? founder.conversationId!;
+
+  // Persist the new conversation id so variations stage uses the same thread.
+  // Each new draft cycle replaces it — no cross-cycle memory bleed.
+  updateFounder(founder.id, { conversationId: draftConversationId });
+  const stagedFounder: FounderProfile = { ...founder, conversationId: draftConversationId };
+
   const results: Partial<Record<PipelineStep, string>> = {};
 
   // Step: niche patterns (Beacon) — optional, degrades gracefully.
@@ -173,7 +220,7 @@ export async function runDraftStage(
   // Step: brief — develops around the selected angle if one was passed in.
   results.brief = await runStep('brief', callbacks, async () => {
     const res = await hivemind.appendToConversation(
-      founder.conversationId!,
+      draftConversationId,
       prompts.briefPrompt(request.angle),
       'genius-strategist',
     );
@@ -183,7 +230,7 @@ export async function runDraftStage(
   // Step: draft pillar.
   results.draft_pillar = await runStep('draft_pillar', callbacks, async () => {
     const res = await hivemind.appendToConversation(
-      founder.conversationId!,
+      draftConversationId,
       prompts.draftPillarPrompt(founder.styleGuide!),
       'ghostwriter',
     );
@@ -193,7 +240,7 @@ export async function runDraftStage(
   // Step: QC.
   results.qc = await runStep('qc', callbacks, async () => {
     const res = await hivemind.appendToConversation(
-      founder.conversationId!,
+      draftConversationId,
       prompts.qcPrompt(),
       'gtm-architect',
     );
@@ -205,7 +252,7 @@ export async function runDraftStage(
   // original draft.
   results.revised_pillar = await runStep('revised_pillar', callbacks, async () => {
     const res = await hivemind.appendToConversation(
-      founder.conversationId!,
+      draftConversationId,
       prompts.revisePillarPrompt(),
       'ghostwriter',
     );
@@ -233,10 +280,16 @@ export async function runVariationsStage(
     { step: 'repurpose_video_script', prompt: prompts.repurposeVideoScriptPrompt },
   ];
 
+  // Variations stage uses the founder's current conversationId — which
+  // runDraftStage just updated to the fresh draft-cycle conversation. So
+  // variations naturally continue the same thread that produced the draft,
+  // without inheriting any older drafts from previous cycles.
+  const conversationId = founder.conversationId!;
+
   for (const { step, prompt } of repurposeSteps) {
     results[step] = await runStep(step, callbacks, async () => {
       const res = await hivemind.appendToConversation(
-        founder.conversationId!,
+        conversationId,
         prompt(),
         'ghostwriter',
       );
