@@ -207,11 +207,18 @@ function parseNumberedItems(text: string): NumberedItem[] {
   if (best.length > 0) return best;
 
   // Graceful degradation: preserve substantial text as one item rather than
-  // dropping it silently
+  // dropping it silently. Strip leading `**` from the title so it doesn't
+  // display literal markdown bold markers.
   if (text.length > 60) {
+    const firstLine = text.split('\n')[0];
+    // Try to extract a clean title from the first bold pair, else strip all `**`
+    const boldMatch = firstLine.match(/^\s*\*\*\s*([^*]+?)\.?\s*\*\*/);
+    const cleanTitle = boldMatch
+      ? boldMatch[1].trim()
+      : firstLine.replace(/\*\*/g, '').trim();
     return [{
       number: 1,
-      title: text.split('\n')[0].slice(0, 100) || '(content)',
+      title: cleanTitle.slice(0, 100) || '(content)',
       body: text,
     }];
   }
@@ -266,32 +273,42 @@ function tryNumberedPatterns(text: string): NumberedItem[] {
   return items;
 }
 
-// Strategy 2 — bold-headed paragraphs (LLM drops the number prefix).
-//   **Title sentence.** Body paragraph that follows...
+// Strategy 2 — bold-headed items (LLM drops the number prefix).
+//   **Title sentence.** Body...    **Next title.** Body...
 //
-//   **Next title sentence.** Body...
-//
-// Each item is a paragraph that starts with **bold** followed by body text.
-// Items get auto-assigned sequential numbers since the source has none.
+// Robust to layout: items can be paragraph-separated, line-separated, or
+// run-on in a single line. We find every `**Title.**` occurrence by position
+// and treat the text between consecutive headers as the body. Title must end
+// with a period and be 15-200 chars to avoid false positives from in-line
+// emphasis bolds.
 function tryBoldHeadedPatterns(text: string): NumberedItem[] {
   const items: NumberedItem[] = [];
-  const paragraphs = text.split(/\n\n+/);
 
-  for (const rawPara of paragraphs) {
-    const p = rawPara.trim();
-    if (!p.startsWith('**')) continue;
+  const headerRegex = /\*\*([^*\n]{15,200}?)\.\*\*/g;
+  const headers: Array<{ start: number; end: number; title: string }> = [];
+  let m: RegExpExecArray | null;
+  while ((m = headerRegex.exec(text)) !== null) {
+    headers.push({
+      start: m.index,
+      end: m.index + m[0].length,
+      title: m[1].trim(),
+    });
+  }
 
-    // **Title.** body (the period inside the closing ** is common; allow either)
-    const m = p.match(/^\*\*([\s\S]+?)\.?\*\*\s*([\s\S]*)$/);
-    if (!m) continue;
+  if (headers.length === 0) return [];
 
-    // Skip if title looks like a numbered prefix (avoid double-matching numbered patterns)
-    if (/^\d+\.?\s/.test(m[1].trim())) continue;
+  for (let i = 0; i < headers.length; i++) {
+    const h = headers[i];
+    // Skip if title looks like a numbered prefix (avoid double-matching)
+    if (/^\d+\.?\s/.test(h.title)) continue;
+
+    const nextStart = i + 1 < headers.length ? headers[i + 1].start : text.length;
+    const body = text.slice(h.end, nextStart).trim();
 
     items.push({
       number: items.length + 1,
-      title: m[1].trim().replace(/\.$/, ''),
-      body: m[2].trim(),
+      title: h.title,
+      body,
     });
   }
 
