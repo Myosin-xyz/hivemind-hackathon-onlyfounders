@@ -1,10 +1,13 @@
 'use client';
 
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import type { PipelineEvent, PipelineStep, TrendBrief } from '@/lib/types';
 import { parseTrendBrief } from '@/lib/trendBriefParser';
 import type { SuggestedAngle } from '@/lib/trendBriefParser';
+import { Wordmark } from '../_brand/Wordmark';
+import { HivemindLockup } from '../_brand/HivemindLockup';
 
 const STEP_LABELS: Record<PipelineStep, string> = {
   voice_extraction: 'Voice extraction',
@@ -19,6 +22,24 @@ const STEP_LABELS: Record<PipelineStep, string> = {
   repurpose_linkedin: 'LinkedIn (native)',
   repurpose_newsletter: 'Newsletter',
   repurpose_pull_quotes: 'Pull quotes',
+};
+
+// Persona meta shown under each step in the pipeline rail. Brand §9: surface
+// the persona doing the work — "ghostwriter is writing", "genius-strategist
+// is reading it". Makes the writer/editor split visible to the room.
+const STEP_PERSONAS: Record<PipelineStep, string> = {
+  voice_extraction:        'ghostwriter · voice extraction',
+  project_create:          'hivemind · project enrichment',
+  niche_patterns:          'beacon · pattern collection',
+  gap_analysis:            'genius-strategist',
+  brief:                   'genius-strategist · brief',
+  draft_pillar:            'ghostwriter · voice-loaded',
+  qc:                      'genius-strategist · editor',
+  revised_pillar:          'ghostwriter · revising',
+  repurpose_x_thread:      'ghostwriter · x',
+  repurpose_linkedin:      'ghostwriter · linkedin',
+  repurpose_newsletter:    'ghostwriter · newsletter',
+  repurpose_pull_quotes:   'ghostwriter · pull quotes',
 };
 
 // Steps whose output is prose meant for human reading — renders with
@@ -428,50 +449,56 @@ function GeneratePageInner() {
   }
 
   return (
-    <main className="min-h-screen bg-neutral-950 text-neutral-100">
+    <main className="min-h-screen bg-of-black text-white">
       <div className="mx-auto max-w-7xl px-6 py-8">
-        <header className="mb-6">
-          <a href="/app" className="text-sm text-neutral-400 hover:text-neutral-200">
-            ← Home
-          </a>
-          <h1 className="mt-2 text-3xl font-bold">
-            Generate for {founder?.name ?? '...'}
-          </h1>
+        <header className="mb-8 flex items-end justify-between gap-6">
+          <div>
+            <Link
+              href="/app"
+              className="font-mono text-[11px] uppercase tracking-[0.14em] text-white/40 hover:text-white/70 transition-colors"
+            >
+              ← back to founders
+            </Link>
+            <h1 className="mt-3 font-display text-4xl font-bold tracking-tight md:text-5xl">
+              {founder?.name ?? '...'}
+            </h1>
+            <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.14em] text-white/40">
+              Run the pipeline
+            </p>
+          </div>
+          <Wordmark size="sm" showTagline={false} className="hidden md:block" />
         </header>
 
-        {/* Step nav */}
-        <nav className="mb-8 border-b border-neutral-800">
+        {/* Step nav — brand stage tabs: status dot + 01 · UPPERCASE LABEL */}
+        <nav className="mb-8 border-b border-white/8">
           <ul className="flex gap-1">
             {([
-              { step: 'trends_angle' as Step, num: 1, label: 'Trends + Angle' },
-              { step: 'draft' as Step, num: 2, label: 'Draft' },
-              { step: 'variations' as Step, num: 3, label: 'Variations' },
+              { step: 'trends_angle' as Step, num: '01', label: 'TRENDS + ANGLE' },
+              { step: 'draft' as Step, num: '02', label: 'DRAFT' },
+              { step: 'variations' as Step, num: '03', label: 'VARIATIONS' },
             ]).map((t) => {
               const tabState = getTabState(t.step);
+              const dotColor =
+                tabState === 'complete' ? 'bg-of-green' :
+                tabState === 'running'  ? 'bg-of-blue animate-pulse' :
+                tabState === 'current'  ? 'bg-of-blue' :
+                                          'bg-white/20';
+              const borderColor =
+                tabState === 'current'  ? 'border-of-blue' : 'border-transparent';
+              const textColor =
+                tabState === 'current'  ? 'text-white' :
+                tabState === 'complete' ? 'text-white/70 hover:text-white' :
+                                          'text-white/40 hover:text-white/70';
               return (
                 <li key={t.step}>
                   <button
                     type="button"
                     onClick={() => setActiveStep(t.step)}
-                    className={`relative flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
-                      tabState === 'current'
-                        ? 'border-white text-white'
-                        : 'border-transparent text-neutral-500 hover:text-neutral-300'
-                    }`}
+                    className={`relative flex items-center gap-3 border-b-2 px-4 py-3 font-mono text-xs font-medium uppercase tracking-[0.12em] transition-colors ${borderColor} ${textColor}`}
                   >
-                    <span
-                      className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-mono ${
-                        tabState === 'current'
-                          ? 'bg-white text-black'
-                          : tabState === 'complete'
-                          ? 'bg-green-600 text-white'
-                          : tabState === 'running'
-                          ? 'bg-blue-600 text-white animate-pulse'
-                          : 'bg-neutral-800 text-neutral-500'
-                      }`}
-                    >
-                      {tabState === 'complete' ? '✓' : t.num}
-                    </span>
+                    <span className={`block h-2 w-2 rounded-full ${dotColor}`} />
+                    <span className="text-white/40">{t.num}</span>
+                    <span className="text-white/30">·</span>
                     <span>{t.label}</span>
                   </button>
                 </li>
@@ -665,19 +692,20 @@ function GeneratePageInner() {
             ) : (
               <>
                 {/* Angle context — always at top */}
-                <div className="rounded-md border border-neutral-800 bg-neutral-900 p-3 text-xs">
-                  <span className="mr-2 text-neutral-500">Angle:</span>
-                  <span className="text-neutral-200">{selectedAngle || customAngle}</span>
+                <div className="rounded-md border border-white/8 bg-white/[0.02] px-4 py-3 text-xs">
+                  <span className="mr-2 font-mono uppercase tracking-wider text-white/35">Angle</span>
+                  <span className="text-white/85">{selectedAngle || customAngle}</span>
                 </div>
 
-                {/* Not started: prominent CTA */}
+                {/* Not started: prominent CTA — brand pill, blue → pink hover */}
                 {!draftComplete && !draftRunning && (
                   <button
                     type="button"
                     onClick={onGenerateDraft}
-                    className="w-full rounded-md bg-white px-6 py-3 font-medium text-black hover:bg-neutral-200"
+                    className="group w-full rounded-full bg-of-blue px-6 py-3.5 font-mono text-xs font-medium uppercase tracking-[0.12em] text-white transition-colors hover:bg-of-pink"
                   >
-                    Generate draft
+                    Run the draft pipeline
+                    <span aria-hidden className="ml-2 inline-block transition-transform group-hover:translate-x-0.5">→</span>
                   </button>
                 )}
 
@@ -719,7 +747,7 @@ function GeneratePageInner() {
                   return (
                     <button
                       disabled
-                      className="w-full rounded-md bg-neutral-700 px-6 py-3 font-medium text-neutral-300"
+                      className="w-full rounded-full border border-of-blue/30 bg-of-blue/10 px-6 py-3.5 font-mono text-xs font-medium uppercase tracking-[0.12em] text-of-blue"
                     >
                       {label}
                     </button>
@@ -730,14 +758,15 @@ function GeneratePageInner() {
                     <button
                       type="button"
                       onClick={() => setActiveStep('variations')}
-                      className="flex-1 rounded-md bg-white px-6 py-3 font-medium text-black hover:bg-neutral-200"
+                      className="group flex-1 rounded-full bg-of-blue px-6 py-3.5 font-mono text-xs font-medium uppercase tracking-[0.12em] text-white transition-colors hover:bg-of-pink"
                     >
-                      Continue to Variations →
+                      Continue to Variations
+                      <span aria-hidden className="ml-2 inline-block transition-transform group-hover:translate-x-0.5">→</span>
                     </button>
                     <button
                       type="button"
                       onClick={onGenerateDraft}
-                      className="rounded-md border border-neutral-700 px-4 py-3 text-sm text-neutral-300 hover:bg-neutral-800"
+                      className="rounded-full border border-white/15 px-5 py-3.5 font-mono text-xs font-medium uppercase tracking-[0.12em] text-white/60 transition-colors hover:border-white/35 hover:text-white"
                     >
                       ↻ Regenerate
                     </button>
@@ -759,14 +788,15 @@ function GeneratePageInner() {
               />
             ) : (
               <>
-                {/* Not started: prominent CTA */}
+                {/* Not started: prominent CTA — brand pill, blue → pink hover */}
                 {!variationsComplete && !variationsRunning && (
                   <button
                     type="button"
                     onClick={onGenerateVariations}
-                    className="w-full rounded-md bg-white px-6 py-3 font-medium text-black hover:bg-neutral-200"
+                    className="group w-full rounded-full bg-of-blue px-6 py-3.5 font-mono text-xs font-medium uppercase tracking-[0.12em] text-white transition-colors hover:bg-of-pink"
                   >
-                    Generate variations
+                    Generate the variations
+                    <span aria-hidden className="ml-2 inline-block transition-transform group-hover:translate-x-0.5">→</span>
                   </button>
                 )}
 
@@ -808,21 +838,22 @@ function GeneratePageInner() {
                   return (
                     <button
                       disabled
-                      className="w-full rounded-md bg-neutral-700 px-6 py-3 font-medium text-neutral-300"
+                      className="w-full rounded-full border border-of-blue/30 bg-of-blue/10 px-6 py-3.5 font-mono text-xs font-medium uppercase tracking-[0.12em] text-of-blue"
                     >
                       {label}
                     </button>
                   );
                 })()}
                 {variationsComplete && !variationsRunning && (
-                  <div className="space-y-2">
-                    <div className="rounded-md border border-green-900/50 bg-green-950/20 px-4 py-3 text-sm text-green-300">
-                      ✓ All 4 variations ready.
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 rounded-full border border-of-green/30 bg-of-green/10 px-4 py-2.5 font-mono text-xs uppercase tracking-[0.12em] text-of-green">
+                      <span aria-hidden>✓</span>
+                      <span>Locked in. Four variations ready.</span>
                     </div>
                     <button
                       type="button"
                       onClick={onGenerateVariations}
-                      className="rounded-md border border-neutral-700 px-4 py-2 text-sm text-neutral-300 hover:bg-neutral-800"
+                      className="rounded-full border border-white/15 px-5 py-2.5 font-mono text-xs font-medium uppercase tracking-[0.12em] text-white/60 transition-colors hover:border-white/35 hover:text-white"
                     >
                       ↻ Regenerate variations
                     </button>
@@ -833,7 +864,73 @@ function GeneratePageInner() {
           </div>
         )}
       </div>
+
+      {/* Brand bottom bar — pipeline context + Hivemind co-brand (brand §4). */}
+      <BottomBar
+        founderName={founder?.name}
+        stepStates={stepStates}
+        activeStep={activeStep}
+        draftStepsForList={draftStepsForList}
+      />
     </main>
+  );
+}
+
+// Brand §4 bottom bar — co-brand strip pinned at the bottom of /generate.
+// Format inspired by brand spec:
+//   hivemind project · [slug]    {persona currently writing}    ✦ Powered by Hivemind
+// When idle, shows stage + completion count instead of persona.
+function BottomBar({
+  founderName,
+  stepStates,
+  activeStep,
+  draftStepsForList,
+}: {
+  founderName?: string;
+  stepStates: Record<string, StepState>;
+  activeStep: 'trends_angle' | 'draft' | 'variations';
+  draftStepsForList: PipelineStep[];
+}) {
+  const stageLabel =
+    activeStep === 'trends_angle' ? '01 · trends' :
+    activeStep === 'draft'        ? '02 · draft' :
+                                    '03 · variations';
+  const stepsForStage =
+    activeStep === 'draft' ? draftStepsForList :
+    activeStep === 'variations' ? VARIATION_STEPS :
+    [];
+  const completedCount = stepsForStage.filter((s) => stepStates[s] === 'completed').length;
+  const totalCount = stepsForStage.length;
+  const currentStep = stepsForStage.find((s) => stepStates[s] === 'in_progress');
+  const currentPersona = currentStep ? STEP_PERSONAS[currentStep] : null;
+  const slug = founderName?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') ?? '';
+
+  return (
+    <div className="mt-12 border-t border-white/8 bg-white/[0.015] px-6 py-3">
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
+        <div className="flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.12em] text-white/30">
+          <span>hivemind project</span>
+          <span className="text-white/15">·</span>
+          <span className="text-white/55">{slug || 'unsaved'}</span>
+          <span className="text-white/15">·</span>
+          <span>{stageLabel}</span>
+        </div>
+
+        <div className="hidden font-mono text-[10px] uppercase tracking-[0.12em] md:block">
+          {currentPersona ? (
+            <span className="text-of-blue italic">{currentPersona}<span className="ml-1 not-italic">is writing<span className="of-cursor" /></span></span>
+          ) : totalCount > 0 ? (
+            <span className="text-white/40">
+              {completedCount}/{totalCount} steps complete
+            </span>
+          ) : (
+            <span className="text-white/25">awaiting input</span>
+          )}
+        </div>
+
+        <HivemindLockup variant="dark" className="opacity-70" />
+      </div>
+    </div>
   );
 }
 
@@ -874,9 +971,11 @@ function PipelineList({
   setActiveTab: (s: PipelineStep) => void;
 }) {
   return (
-    <div className="rounded-lg border border-neutral-800 bg-neutral-900/60 p-4">
-      <h3 className="mb-3 text-sm font-semibold text-neutral-300">Pipeline</h3>
-      <ul className="space-y-1.5">
+    <div className="rounded-lg border border-white/8 bg-white/[0.02] p-4">
+      <h3 className="mb-4 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-white/45">
+        Pipeline
+      </h3>
+      <ul className="space-y-1">
         {steps.map((step) => {
           const state = stepStates[step] ?? 'pending';
           const hasOutput = !!stepOutputs[step];
@@ -884,32 +983,42 @@ function PipelineList({
             state === 'in_progress' && stepStartedAt[step]
               ? formatElapsed(Date.now() - stepStartedAt[step])
               : null;
+          const isActive = state === 'in_progress';
           return (
             <li
               key={step}
               onClick={() => hasOutput && setActiveTab(step)}
-              className={`flex items-center gap-2 rounded px-2 py-1 text-sm transition-colors ${
-                hasOutput ? 'cursor-pointer hover:bg-neutral-800/50' : 'cursor-default'
-              }`}
+              className={`rounded-md px-3 py-2 transition-colors ${
+                isActive
+                  ? 'border border-of-blue/40 bg-of-blue/5'
+                  : 'border border-transparent'
+              } ${hasOutput ? 'cursor-pointer hover:bg-white/[0.04]' : 'cursor-default'}`}
             >
-              <StateIcon state={state} />
-              <span
-                className={
-                  state === 'completed'
-                    ? 'text-neutral-200'
-                    : state === 'in_progress'
-                    ? 'text-blue-400'
-                    : state === 'failed'
-                    ? 'text-red-400'
-                    : 'text-neutral-500'
-                }
-              >
-                {STEP_LABELS[step]}
-              </span>
-              {elapsed && (
-                <span className="ml-auto font-mono text-xs text-blue-400 tabular-nums">
-                  {elapsed}
+              <div className="flex items-center gap-2.5">
+                <StateIcon state={state} />
+                <span
+                  className={`font-mono text-[11px] uppercase tracking-[0.1em] ${
+                    state === 'completed'
+                      ? 'text-white/80'
+                      : state === 'in_progress'
+                      ? 'text-of-blue'
+                      : state === 'failed'
+                      ? 'text-red-400'
+                      : 'text-white/35'
+                  }`}
+                >
+                  {STEP_LABELS[step]}
                 </span>
+                {elapsed && (
+                  <span className="ml-auto font-mono text-[10px] text-of-blue tabular-nums">
+                    {elapsed}
+                  </span>
+                )}
+              </div>
+              {STEP_PERSONAS[step] && (
+                <div className="of-persona ml-[26px] mt-0.5 italic">
+                  {STEP_PERSONAS[step]}
+                </div>
               )}
             </li>
           );
@@ -1207,7 +1316,7 @@ function AngleChips({
 function StateIcon({ state }: { state: StepState }) {
   if (state === 'completed') {
     return (
-      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-green-600/20 text-green-400">
+      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-of-green/20 text-of-green">
         <svg viewBox="0 0 12 12" className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="2 6 5 9 10 3" />
         </svg>
@@ -1217,14 +1326,14 @@ function StateIcon({ state }: { state: StepState }) {
   if (state === 'in_progress') {
     return (
       <span className="relative flex h-3 w-3 items-center justify-center">
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-500 opacity-60" />
-        <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-500" />
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-of-blue opacity-60" />
+        <span className="relative inline-flex h-2 w-2 rounded-full bg-of-blue" />
       </span>
     );
   }
   if (state === 'failed') {
     return (
-      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-red-600/20 text-red-400">
+      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-of-orange/20 text-of-orange">
         <svg viewBox="0 0 12 12" className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
           <line x1="3" y1="3" x2="9" y2="9" />
           <line x1="9" y1="3" x2="3" y2="9" />
@@ -1232,7 +1341,7 @@ function StateIcon({ state }: { state: StepState }) {
       </span>
     );
   }
-  return <span className="block h-2 w-2 rounded-full border border-neutral-600" />;
+  return <span className="block h-2 w-2 rounded-full border border-white/20" />;
 }
 
 // Tiny inline markdown renderer for brief and qc outputs.

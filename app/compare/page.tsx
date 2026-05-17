@@ -1,8 +1,11 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
+import { Wordmark } from '../_brand/Wordmark';
+import { HivemindLockup } from '../_brand/HivemindLockup';
 
-// Two-way blind test viewer.
+// Two-way blind test viewer. Light surface per brand §5.
 // A = generic Claude (via /api/baseline)
 // B = Only Founders output (pasted from /generate)
 //
@@ -92,16 +95,24 @@ export default function ComparePage() {
   }
 
   return (
-    <main className="min-h-screen bg-neutral-950 text-neutral-100">
-      <div className="mx-auto max-w-7xl px-6 py-12">
-        <header className="mb-8">
-          <a href="/app" className="text-sm text-neutral-400 hover:text-neutral-200">
-            ← Home
-          </a>
-          <h1 className="mt-2 text-3xl font-bold">Blind test</h1>
-          <p className="mt-2 text-neutral-400">
-            Show both to the room. Ask which one sounds like a real founder wrote it.
-          </p>
+    <main className="min-h-screen bg-of-off-white text-of-black">
+      <div className="mx-auto max-w-7xl px-6 py-10">
+        <header className="mb-10 flex items-end justify-between gap-6">
+          <div>
+            <Link
+              href="/app"
+              className="font-mono text-[11px] uppercase tracking-[0.14em] text-of-black/40 hover:text-of-black/70 transition-colors"
+            >
+              ← back to founders
+            </Link>
+            <h1 className="mt-3 font-display text-4xl font-bold tracking-tight text-of-black md:text-5xl">
+              Blind test
+            </h1>
+            <p className="mt-2 max-w-xl text-of-black/60">
+              Show both to the room. Ask which one sounds like a real founder wrote it.
+            </p>
+          </div>
+          <Wordmark size="sm" showTagline={false} theme="light" className="hidden md:block" />
         </header>
 
         {columns.length === 0 ? (
@@ -131,6 +142,14 @@ export default function ComparePage() {
             onReshuffle={loadBlindTest}
           />
         )}
+
+        {/* Brand §4: Powered by Hivemind, pill variant on light surface */}
+        <footer className="mt-16 flex items-center justify-between border-t border-of-black/10 pt-6">
+          <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-of-black/30">
+            OF · the blind test
+          </p>
+          <HivemindLockup variant="light" />
+        </footer>
       </div>
     </main>
   );
@@ -151,41 +170,45 @@ function SetupPanel(props: {
 }) {
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between rounded-lg border border-blue-900/50 bg-blue-950/30 px-4 py-3">
-        <div className="text-sm text-blue-200">
+      <div className="flex items-center justify-between rounded-lg border border-of-blue/20 bg-of-blue/5 px-4 py-3">
+        <div className="text-sm text-of-blue">
           Demo prep: load a pre-filled case to skip the paste step.
         </div>
         <button
           type="button"
           onClick={props.onLoadDemo}
           disabled={props.loadingDemo}
-          className="rounded-md bg-blue-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-400 disabled:opacity-50"
+          className="rounded-full bg-of-blue px-4 py-1.5 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-white transition-colors hover:bg-of-pink disabled:opacity-50"
         >
-          {props.loadingDemo ? 'Loading demo…' : 'Load Salo demo'}
+          {props.loadingDemo ? 'Loading…' : 'Load Salo demo'}
         </button>
       </div>
 
-      <section className="rounded-lg border border-neutral-800 bg-neutral-900 p-6">
-        <h2 className="mb-3 text-lg font-semibold">Topic</h2>
-        <p className="mb-3 text-sm text-neutral-400">
-          The topic both pieces are about. Generic Claude generates from this; Only Founders output is what you produce from /generate on the same topic.
+      <section className="rounded-lg border border-of-black/8 bg-white p-6 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+        <h2 className="mb-2 font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-of-black/50">
+          Topic
+        </h2>
+        <p className="mb-3 text-sm text-of-black/55">
+          The topic both pieces are about. Generic Claude generates from this; Only Founders output is what you produce from the pipeline on the same topic.
         </p>
         <input
           type="text"
           value={props.topic}
           onChange={(e) => props.setTopic(e.target.value)}
           placeholder="e.g., why agentic workflows beat single LLM prompts"
-          className="w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-200"
+          className="w-full rounded-md border border-of-black/12 bg-white px-3 py-2 text-sm text-of-black placeholder:text-of-black/30"
         />
       </section>
 
-      <section className="rounded-lg border border-neutral-800 bg-neutral-900 p-6">
+      <section className="rounded-lg border border-of-black/8 bg-white p-6 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">A — Generic AI baseline</h2>
+          <h2 className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-of-black/50">
+            A · Generic AI baseline
+          </h2>
           <button
             onClick={props.onGenerateBaseline}
             disabled={!props.topic.trim() || props.running}
-            className="rounded-md border border-neutral-700 px-3 py-1.5 text-xs hover:bg-neutral-800 disabled:opacity-50"
+            className="rounded-full border border-of-black/15 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-of-black/60 transition-colors hover:border-of-black/30 hover:text-of-black disabled:opacity-40"
           >
             {props.running ? 'Generating…' : 'Generate baseline'}
           </button>
@@ -195,27 +218,30 @@ function SetupPanel(props: {
           onChange={(e) => props.setGenericClaude(e.target.value)}
           placeholder="Click 'Generate baseline' or paste a generic AI output here..."
           rows={8}
-          className="w-full rounded-md border border-neutral-700 bg-neutral-800 p-3 text-sm font-sans text-neutral-200 leading-relaxed"
+          className="w-full rounded-md border border-of-black/12 bg-white p-3 text-sm leading-relaxed text-of-black placeholder:text-of-black/30"
         />
       </section>
 
-      <section className="rounded-lg border border-neutral-800 bg-neutral-900 p-6">
-        <h2 className="mb-3 text-lg font-semibold">B — Only Founders output</h2>
+      <section className="rounded-lg border border-of-black/8 bg-white p-6 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+        <h2 className="mb-3 font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-of-black/50">
+          B · Only Founders output
+        </h2>
         <textarea
           value={props.onlyFounders}
           onChange={(e) => props.setOnlyFounders(e.target.value)}
-          placeholder="Paste the pillar output from /generate..."
+          placeholder="Paste the pillar output from the pipeline..."
           rows={8}
-          className="w-full rounded-md border border-neutral-700 bg-neutral-800 p-3 text-sm font-sans text-neutral-200 leading-relaxed"
+          className="w-full rounded-md border border-of-black/12 bg-white p-3 text-sm leading-relaxed text-of-black placeholder:text-of-black/30"
         />
       </section>
 
       <button
         onClick={props.onLoadBlindTest}
         disabled={!props.genericClaude.trim() || !props.onlyFounders.trim()}
-        className="w-full rounded-md bg-white px-6 py-3 font-medium text-black hover:bg-neutral-200 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="group w-full rounded-full bg-of-black px-6 py-3.5 font-mono text-xs font-medium uppercase tracking-[0.12em] text-white transition-colors hover:bg-of-pink disabled:opacity-40 disabled:cursor-not-allowed"
       >
         Load blind test (shuffled)
+        <span aria-hidden className="ml-2 inline-block transition-transform group-hover:translate-x-0.5">→</span>
       </button>
     </div>
   );
@@ -232,13 +258,13 @@ function BlindTestView(props: {
   return (
     <div>
       {props.topic && (
-        <div className="mb-4 rounded-md border border-neutral-800 bg-neutral-900 px-4 py-3">
-          <span className="text-xs uppercase tracking-wide text-neutral-500">Topic</span>
-          <div className="text-sm text-neutral-200">{props.topic}</div>
+        <div className="mb-5 rounded-md border border-of-black/8 bg-white px-4 py-3 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+          <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-of-black/40">Topic</span>
+          <div className="text-sm text-of-black/90">{props.topic}</div>
         </div>
       )}
-      <div className="mb-6 flex justify-between items-center">
-        <p className="text-sm text-neutral-400">
+      <div className="mb-6 flex items-center justify-between">
+        <p className="text-sm text-of-black/60">
           {props.revealed
             ? 'Revealed. Reshuffle for another round.'
             : 'Which one sounds like a real founder wrote it?'}
@@ -247,22 +273,23 @@ function BlindTestView(props: {
           {!props.revealed && (
             <button
               onClick={props.onReveal}
-              className="rounded-md bg-white px-4 py-2 text-sm font-medium text-black hover:bg-neutral-200"
+              className="group rounded-full bg-of-black px-5 py-2 font-mono text-xs font-medium uppercase tracking-[0.12em] text-white transition-colors hover:bg-of-pink"
             >
               Reveal
+              <span aria-hidden className="ml-1.5 inline-block transition-transform group-hover:translate-x-0.5">→</span>
             </button>
           )}
           <button
             onClick={props.onReshuffle}
-            className="rounded-md border border-neutral-700 px-4 py-2 text-sm hover:bg-neutral-800"
+            className="rounded-full border border-of-black/15 px-4 py-2 font-mono text-xs uppercase tracking-[0.12em] text-of-black/60 transition-colors hover:border-of-black/35 hover:text-of-black"
           >
-            Reshuffle
+            ↻ Reshuffle
           </button>
           <button
             onClick={props.onReset}
-            className="rounded-md border border-neutral-700 px-4 py-2 text-sm hover:bg-neutral-800"
+            className="rounded-full border border-of-black/15 px-4 py-2 font-mono text-xs uppercase tracking-[0.12em] text-of-black/60 transition-colors hover:border-of-black/35 hover:text-of-black"
           >
-            ← Edit inputs
+            ← Edit
           </button>
         </div>
       </div>
@@ -271,27 +298,27 @@ function BlindTestView(props: {
         {props.columns.map((col, idx) => (
           <div
             key={idx}
-            className={`rounded-lg border bg-neutral-900 p-5 max-h-[75vh] overflow-y-auto transition-colors ${
+            className={`rounded-lg border bg-white p-6 max-h-[75vh] overflow-y-auto transition-all shadow-[0_1px_3px_rgba(0,0,0,0.04)] ${
               props.revealed && col.revealedAs === 'B'
-                ? 'border-green-700/50 ring-1 ring-green-700/30'
-                : 'border-neutral-800'
+                ? 'border-of-blue/40 ring-2 ring-of-blue/15'
+                : 'border-of-black/10'
             }`}
           >
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-lg font-semibold">{col.label}</h3>
+              <h3 className="font-display text-xl font-bold text-of-black">{col.label}</h3>
               {props.revealed && (
                 <span
-                  className={`text-xs font-medium px-2 py-0.5 rounded ${
+                  className={`font-mono text-[10px] font-medium uppercase tracking-[0.14em] px-2.5 py-1 rounded-full ${
                     col.revealedAs === 'A'
-                      ? 'bg-neutral-800 text-neutral-300'
-                      : 'bg-green-950 text-green-300'
+                      ? 'bg-of-black/8 text-of-black/55'
+                      : 'bg-of-blue text-white'
                   }`}
                 >
                   {col.revealedAs === 'A' ? 'Generic AI' : 'Only Founders'}
                 </span>
               )}
             </div>
-            <div className="whitespace-pre-wrap font-sans text-sm text-neutral-200 leading-relaxed">
+            <div className="whitespace-pre-wrap text-sm leading-relaxed text-of-black/85">
               {col.content}
             </div>
           </div>

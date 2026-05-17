@@ -1,8 +1,10 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { VOICE_PROFILE_SCHEMA } from '@/lib/voiceSchema';
+import { Wordmark } from '../_brand/Wordmark';
 
 type VoiceSource = 'twitter' | 'voiceMd' | 'samples';
 
@@ -61,7 +63,7 @@ export default function OnboardPage() {
 
     setSubmitting(true);
     setError(null);
-    setProgressLabel('Creating project context (scraping site)…');
+    setProgressLabel('Scraping site, enriching project context…');
 
     const samplesArr = samples
       .split(/\n---+\n/)
@@ -83,8 +85,8 @@ export default function OnboardPage() {
       const progressTimer = setTimeout(() => {
         setProgressLabel(
           voiceSource === 'twitter'
-            ? 'Analyzing Twitter voice (this can take ~90s)…'
-            : 'Extracting voice profile…',
+            ? 'Analyzing Twitter voice via Beacon (~90s)…'
+            : 'Extracting voice profile via ghostwriter…',
         );
       }, 10_000);
 
@@ -137,38 +139,46 @@ export default function OnboardPage() {
   }
 
   return (
-    <main className="min-h-screen bg-neutral-950 text-neutral-100">
+    <main className="min-h-screen bg-of-black text-white">
       <div className="mx-auto max-w-2xl px-6 py-12">
-        <header className="mb-10">
-          <a href="/app" className="text-sm text-neutral-400 hover:text-neutral-200">
-            ← Home
-          </a>
-          <h1 className="mt-3 text-3xl font-bold">Onboard founder</h1>
-          <p className="mt-2 text-neutral-400">
-            Three inputs. We figure out the rest from your site and your voice.
-          </p>
+        <header className="mb-10 flex items-end justify-between gap-6">
+          <div>
+            <Link
+              href="/app"
+              className="font-mono text-[11px] uppercase tracking-[0.14em] text-white/40 hover:text-white/70 transition-colors"
+            >
+              ← back to founders
+            </Link>
+            <h1 className="mt-3 font-display text-4xl font-bold tracking-tight md:text-5xl">
+              Voice capture
+            </h1>
+            <p className="mt-2 max-w-lg text-white/60">
+              Tell us what you actually sound like. Three inputs. Site gets scraped. Voice gets profiled. Project context lives in Hivemind.
+            </p>
+          </div>
+          <Wordmark size="sm" showTagline={false} className="hidden md:block" />
         </header>
 
-        <form onSubmit={onSubmit} className="space-y-6">
+        <form onSubmit={onSubmit} className="space-y-7">
           {/* Name */}
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-neutral-300">
-              Name <span className="text-red-400">*</span>
+            <label className="mb-2 block font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-white/50">
+              Name <span className="text-of-pink">*</span>
             </label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Gonçalo / Salo"
+              placeholder="Salo"
               required
-              className="w-full rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100"
+              className="w-full rounded-md border border-white/12 bg-white/[0.03] px-3 py-2.5 text-sm text-white placeholder:text-white/25"
             />
           </div>
 
           {/* Website URL */}
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-neutral-300">
-              Website URL <span className="text-red-400">*</span>
+            <label className="mb-2 block font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-white/50">
+              Website URL <span className="text-of-pink">*</span>
             </label>
             <input
               type="url"
@@ -176,36 +186,36 @@ export default function OnboardPage() {
               onChange={(e) => setWebsiteUrl(e.target.value)}
               placeholder="https://myosin.xyz"
               required
-              className="w-full rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100"
+              className="w-full rounded-md border border-white/12 bg-white/[0.03] px-3 py-2.5 text-sm text-white placeholder:text-white/25"
             />
-            <p className="mt-1 text-xs text-neutral-500">
-              We'll scrape this — extracts description, audiences, social handles.
+            <p className="mt-1.5 text-xs text-white/40">
+              We'll scrape this. Extracts description, audiences, social handles.
             </p>
           </div>
 
           {/* Voice source picker */}
           <div>
-            <div className="mb-1.5 flex items-center justify-between">
-              <label className="block text-sm font-medium text-neutral-300">
-                Voice source <span className="text-red-400">*</span>
+            <div className="mb-2 flex items-center justify-between">
+              <label className="block font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-white/50">
+                Voice source <span className="text-of-pink">*</span>
               </label>
               {voiceSource === 'voiceMd' && (
                 <button
                   type="button"
                   onClick={downloadTemplate}
-                  className="text-xs text-blue-400 hover:underline"
+                  className="font-mono text-[10px] uppercase tracking-[0.12em] text-of-blue hover:text-of-pink transition-colors"
                 >
-                  Download template
+                  ↓ Download template
                 </button>
               )}
             </div>
 
             {/* Tab strip */}
-            <div className="mb-3 flex gap-1 rounded-md border border-neutral-800 bg-neutral-900 p-1">
+            <div className="mb-3 flex gap-1 rounded-md border border-white/8 bg-white/[0.02] p-1">
               {(
                 [
                   { id: 'twitter', label: 'Twitter / X', hint: 'fastest' },
-                  { id: 'voiceMd', label: 'Voice.md upload', hint: 'highest fidelity' },
+                  { id: 'voiceMd', label: 'Voice.md', hint: 'highest fidelity' },
                   { id: 'samples', label: 'Paste samples', hint: 'flexible' },
                 ] as { id: VoiceSource; label: string; hint: string }[]
               ).map((opt) => (
@@ -213,14 +223,16 @@ export default function OnboardPage() {
                   key={opt.id}
                   type="button"
                   onClick={() => setVoiceSource(opt.id)}
-                  className={`flex-1 rounded px-3 py-2 text-sm transition-colors ${
+                  className={`flex-1 rounded px-3 py-2.5 transition-colors ${
                     voiceSource === opt.id
-                      ? 'bg-white text-black'
-                      : 'text-neutral-400 hover:text-neutral-200'
+                      ? 'bg-of-blue text-white'
+                      : 'text-white/45 hover:text-white/80 hover:bg-white/[0.03]'
                   }`}
                 >
-                  <div>{opt.label}</div>
-                  <div className="text-xs opacity-60">{opt.hint}</div>
+                  <div className="text-sm font-medium">{opt.label}</div>
+                  <div className="font-mono text-[9px] uppercase tracking-[0.1em] opacity-65">
+                    {opt.hint}
+                  </div>
                 </button>
               ))}
             </div>
@@ -232,16 +244,16 @@ export default function OnboardPage() {
                 value={twitterHandle}
                 onChange={(e) => setTwitterHandle(e.target.value)}
                 placeholder="@0xSalo"
-                className="w-full rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100"
+                className="w-full rounded-md border border-white/12 bg-white/[0.03] px-3 py-2.5 text-sm text-white placeholder:text-white/25"
               />
             )}
             {voiceSource === 'voiceMd' && (
               <textarea
                 value={voiceMd}
                 onChange={(e) => setVoiceMd(e.target.value)}
-                placeholder="Paste a filled-out voice.md here. Canonical — used directly as the style guide."
+                placeholder="Paste a filled-out voice.md here. Canonical, used directly as the style guide."
                 rows={8}
-                className="w-full rounded-md border border-neutral-800 bg-neutral-900 p-3 text-sm font-mono text-neutral-200"
+                className="w-full rounded-md border border-white/12 bg-white/[0.03] p-3 text-sm font-mono text-white placeholder:text-white/25"
               />
             )}
             {voiceSource === 'samples' && (
@@ -250,69 +262,72 @@ export default function OnboardPage() {
                 onChange={(e) => setSamples(e.target.value)}
                 placeholder="Paste 3-10 of your best long-form pieces. Separate each with --- on its own line."
                 rows={10}
-                className="w-full rounded-md border border-neutral-800 bg-neutral-900 p-3 text-sm font-mono text-neutral-200"
+                className="w-full rounded-md border border-white/12 bg-white/[0.03] p-3 text-sm leading-relaxed text-white placeholder:text-white/25"
               />
             )}
           </div>
 
           {/* Error */}
           {error && (
-            <div className="rounded-md border border-red-900 bg-red-950/50 px-4 py-3 text-sm text-red-300">
+            <div className="rounded-md border border-of-orange/40 bg-of-orange/10 px-4 py-3 text-sm text-of-orange">
               {error}
             </div>
           )}
 
-          {/* Submit */}
+          {/* Submit — brand pill, blue → pink hover */}
           <div>
             <button
               type="submit"
               disabled={submitting}
-              className="w-full rounded-md bg-white px-6 py-3 font-medium text-black hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-50"
+              className="group w-full rounded-full bg-of-blue px-6 py-3.5 font-mono text-xs font-medium uppercase tracking-[0.12em] text-white transition-colors hover:bg-of-pink disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-of-blue"
             >
-              {submitting ? progressLabel ?? 'Setting up…' : '⚡ Start'}
+              {submitting ? progressLabel ?? 'Setting up…' : 'Create founder'}
+              {!submitting && (
+                <span aria-hidden className="ml-2 inline-block transition-transform group-hover:translate-x-0.5">→</span>
+              )}
             </button>
             {submitting && (
-              <p className="mt-2 text-center text-xs text-neutral-500">
-                Hivemind enrichment + voice extraction. Usually 30-90s.
+              <p className="mt-3 text-center font-mono text-[10px] uppercase tracking-[0.12em] text-white/40">
+                Scraping site → enriching project → resolving voice · 30-90s
               </p>
             )}
           </div>
 
           {/* Optional polish — accordion */}
-          <div className="border-t border-neutral-800 pt-6">
+          <div className="border-t border-white/8 pt-6">
             <button
               type="button"
               onClick={() => setShowAdvanced(!showAdvanced)}
-              className="flex w-full items-center justify-between text-sm text-neutral-400 hover:text-neutral-200"
+              className="flex w-full items-center justify-between font-mono text-[11px] uppercase tracking-[0.12em] text-white/45 hover:text-white/75 transition-colors"
             >
-              <span>Optional polish — can add later from the profile page</span>
-              <span>{showAdvanced ? '▲' : '▼'}</span>
+              <span>Optional. Can add from the profile page after onboarding.</span>
+              <span className="font-sans">{showAdvanced ? '▾' : '▸'}</span>
             </button>
 
             {showAdvanced && (
               <div className="mt-6 space-y-5">
                 <Field
                   label="Doctrine"
-                  hint="3-7 named POVs the content should be grounded in. Optional now — can edit later."
+                  hint="3-7 named POVs the content should be grounded in. Can edit later."
                 >
                   <textarea
                     value={doctrine}
                     onChange={(e) => setDoctrine(e.target.value)}
                     rows={5}
-                    className="w-full rounded-md border border-neutral-800 bg-neutral-900 p-3 text-sm text-neutral-100"
+                    className="w-full rounded-md border border-white/12 bg-white/[0.03] p-3 text-sm text-white placeholder:text-white/25"
                   />
                 </Field>
 
                 <Field
                   label="Recent pillar posts"
-                  hint="3-5 recent posts for gap analysis. Separate with ---. Optional — degrades gracefully."
+                  hint="3-5 recent posts for gap analysis. Separate with ---. Degrades gracefully."
                 >
                   <textarea
                     value={recentPosts}
                     onChange={(e) => setRecentPosts(e.target.value)}
                     rows={6}
-                    placeholder="Post 1...&#10;---&#10;Post 2..."
-                    className="w-full rounded-md border border-neutral-800 bg-neutral-900 p-3 text-sm font-mono text-neutral-200"
+                    placeholder={'Post 1...\n---\nPost 2...'}
+                    className="w-full rounded-md border border-white/12 bg-white/[0.03] p-3 text-sm font-mono text-white placeholder:text-white/25"
                   />
                 </Field>
 
@@ -320,10 +335,10 @@ export default function OnboardPage() {
                   <select
                     value={niche}
                     onChange={(e) => setNiche(e.target.value)}
-                    className="w-full rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100"
+                    className="w-full rounded-md border border-white/12 bg-white/[0.03] px-3 py-2.5 text-sm text-white"
                   >
                     {NICHE_PRESETS.map((n) => (
-                      <option key={n} value={n}>
+                      <option key={n} value={n} className="bg-of-black">
                         {n}
                       </option>
                     ))}
@@ -336,7 +351,7 @@ export default function OnboardPage() {
                     value={keywords}
                     onChange={(e) => setKeywords(e.target.value)}
                     placeholder="ai agents, llm tools, agent workflows"
-                    className="w-full rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100"
+                    className="w-full rounded-md border border-white/12 bg-white/[0.03] px-3 py-2.5 text-sm text-white placeholder:text-white/25"
                   />
                 </Field>
               </div>
@@ -359,9 +374,11 @@ function Field({
 }) {
   return (
     <div>
-      <label className="mb-1.5 block text-sm font-medium text-neutral-300">{label}</label>
+      <label className="mb-2 block font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-white/50">
+        {label}
+      </label>
       {children}
-      {hint && <p className="mt-1 text-xs text-neutral-500">{hint}</p>}
+      {hint && <p className="mt-1.5 text-xs text-white/40">{hint}</p>}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Syne, DM_Sans, DM_Mono } from "next/font/google";
 import "./globals.css";
-import { HivemindLockup } from "./_brand/HivemindLockup";
+import { ConditionalFooter } from "./_brand/ConditionalFooter";
 
 const syne = Syne({
   variable: "--font-syne",
@@ -40,11 +40,9 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-of-black text-white">
         <div className="flex-1">{children}</div>
-        {/* Mandatory: Powered by Hivemind appears on every page (brand §4). */}
-        {/* Pages with their own bottom bar render this inline; this is the safety net. */}
-        <footer className="border-t border-white/5 px-6 py-2.5 flex items-center justify-end">
-          <HivemindLockup variant="dark" />
-        </footer>
+        {/* Mandatory: Powered by Hivemind on every screen (brand §4). */}
+        {/* ConditionalFooter suppresses on pages that render their own (e.g. the cover hero). */}
+        <ConditionalFooter />
       </body>
     </html>
   );
