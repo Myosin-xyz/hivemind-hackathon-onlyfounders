@@ -660,30 +660,28 @@ function GeneratePageInner() {
                   </button>
                 )}
 
-                {/* Output viewer — main content area when something's happening */}
+                {/* 2-column: pipeline (30%) + output viewer (70%) */}
                 {(draftRunning || draftComplete) && (
-                  <OutputViewer
-                    tabs={draftStepsForList}
-                    stepOutputs={stepOutputs}
-                    activeTab={activeTab}
-                    setActiveTab={setActiveTab}
-                    running={draftRunning}
-                    emptyMessage={
-                      draftRunning
-                        ? 'Pipeline running… outputs stream in as each step completes.'
-                        : 'Click a tab above to view that step\'s output.'
-                    }
-                  />
-                )}
-
-                {/* Pipeline progress — supplementary, below output */}
-                {(draftRunning || draftComplete) && (
-                  <PipelineList
-                    steps={draftStepsForList}
-                    stepStates={stepStates}
-                    stepOutputs={stepOutputs}
-                    setActiveTab={setActiveTab}
-                  />
+                  <div className="grid grid-cols-1 gap-6 lg:grid-cols-[3fr_7fr]">
+                    <PipelineList
+                      steps={draftStepsForList}
+                      stepStates={stepStates}
+                      stepOutputs={stepOutputs}
+                      setActiveTab={setActiveTab}
+                    />
+                    <OutputViewer
+                      tabs={draftStepsForList}
+                      stepOutputs={stepOutputs}
+                      activeTab={activeTab}
+                      setActiveTab={setActiveTab}
+                      running={draftRunning}
+                      emptyMessage={
+                        draftRunning
+                          ? 'Pipeline running… outputs stream in as each step completes.'
+                          : 'Click a tab above to view that step\'s output.'
+                      }
+                    />
+                  </div>
                 )}
 
                 {/* Actions at bottom — after the user has read */}
@@ -740,30 +738,28 @@ function GeneratePageInner() {
                   </button>
                 )}
 
-                {/* Output viewer (the variations themselves) */}
+                {/* 2-column: pipeline (30%) + output viewer (70%) */}
                 {(variationsRunning || variationsComplete) && (
-                  <OutputViewer
-                    tabs={VARIATION_STEPS}
-                    stepOutputs={stepOutputs}
-                    activeTab={activeTab}
-                    setActiveTab={setActiveTab}
-                    running={variationsRunning}
-                    emptyMessage={
-                      variationsRunning
-                        ? 'Generating each variation in sequence…'
-                        : 'Click a tab above to view that variation.'
-                    }
-                  />
-                )}
-
-                {/* Pipeline progress */}
-                {(variationsRunning || variationsComplete) && (
-                  <PipelineList
-                    steps={VARIATION_STEPS}
-                    stepStates={stepStates}
-                    stepOutputs={stepOutputs}
-                    setActiveTab={setActiveTab}
-                  />
+                  <div className="grid grid-cols-1 gap-6 lg:grid-cols-[3fr_7fr]">
+                    <PipelineList
+                      steps={VARIATION_STEPS}
+                      stepStates={stepStates}
+                      stepOutputs={stepOutputs}
+                      setActiveTab={setActiveTab}
+                    />
+                    <OutputViewer
+                      tabs={VARIATION_STEPS}
+                      stepOutputs={stepOutputs}
+                      activeTab={activeTab}
+                      setActiveTab={setActiveTab}
+                      running={variationsRunning}
+                      emptyMessage={
+                        variationsRunning
+                          ? 'Generating each variation in sequence…'
+                          : 'Click a tab above to view that variation.'
+                      }
+                    />
+                  </div>
                 )}
 
                 {/* Actions at bottom */}
