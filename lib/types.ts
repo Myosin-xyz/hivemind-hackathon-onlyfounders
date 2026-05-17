@@ -118,9 +118,9 @@ export type PipelineStep =
   | 'qc'
   | 'revised_pillar'
   | 'repurpose_x_thread'
-  | 'repurpose_blog'
+  | 'repurpose_linkedin'
   | 'repurpose_newsletter'
-  | 'repurpose_video_script';
+  | 'repurpose_pull_quotes';
 
 export type PipelineEvent =
   | { type: 'step_started'; step: PipelineStep }

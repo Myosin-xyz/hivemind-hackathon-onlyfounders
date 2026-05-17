@@ -275,9 +275,9 @@ export async function runVariationsStage(
   // so parallel calls to the same conversation could race.
   const repurposeSteps: Array<{ step: PipelineStep; prompt: () => string }> = [
     { step: 'repurpose_x_thread', prompt: prompts.repurposeXThreadPrompt },
-    { step: 'repurpose_blog', prompt: prompts.repurposeBlogPrompt },
+    { step: 'repurpose_linkedin', prompt: prompts.repurposeLinkedInPrompt },
     { step: 'repurpose_newsletter', prompt: prompts.repurposeNewsletterPrompt },
-    { step: 'repurpose_video_script', prompt: prompts.repurposeVideoScriptPrompt },
+    { step: 'repurpose_pull_quotes', prompt: prompts.repurposePullQuotesPrompt },
   ];
 
   // Variations stage uses the founder's current conversationId — which

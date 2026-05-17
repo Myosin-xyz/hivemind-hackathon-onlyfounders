@@ -276,35 +276,66 @@ Output as markdown:
 export function repurposeXThreadPrompt(): string {
   return `Repurpose the FINAL pillar (the revised version produced after QC, above in our conversation) into an X thread.
 
+THE FIRST TWEET IS THE WHOLE GAME. Most threads die on tweet 1.
+
+Hook engineering for tweet 1:
+- Mine the pillar for the SHARPEST single line — usually the most counterintuitive claim, the most specific concrete detail, or the most striking metaphor
+- Tweet 1 must work as a standalone tweet someone would write even if there was no thread. Someone who sees only this tweet should feel a pull.
+- Use ONE of these hook patterns (pick the strongest for THIS pillar):
+  * **Concrete-observation hook** — open with a specific dated/named detail that recontextualizes ("In 2014, 'hosted on AWS' was a line in pitch decks.")
+  * **Counterfactual hook** — name the conventional belief and quietly undercut it ("Everyone thinks X happens once. It happens every quarter now.")
+  * **Bold claim hook** — state the asymmetric move as a flat assertion ("The model is the least interesting layer in the stack.")
+  * **Curiosity gap hook** — name the surprise and withhold the payoff ("Three things happened in 30 days that obsoleted half the agency pitches in crypto.")
+- FORBIDDEN openers: "Thread on...", "1/", "Hot take:", "🧵", any signaling that this is a thread, generic openers like "Most people don't realize..."
+- The first tweet must NEVER feel like the opening to a thread. It must feel like a tweet.
+
+STRUCTURE:
+- Tweet 1: standalone hook (~240 chars max, no thread signaling)
+- Tweets 2-7: the argument, ONE beat per tweet, each ending with quiet momentum to the next
+- Final tweet: a memorable line that lands on its own. NOT a CTA. NOT "follow me for more". NOT a link.
+
 CONSTRAINTS:
-- 6-10 tweets
-- First tweet must hook in under 240 chars; treat it as a standalone tweet that earns the click
-- Each subsequent tweet: 240-280 chars
-- Last tweet: soft call-to-action or memorable close, no link spam
-- Preserve the founder's voice rhythm and hook patterns
-- No hashtag spam, no emoji clutter unless voice profile uses them
+- 6-10 tweets total
+- Each tweet 240-280 chars (treat each as standalone — could survive being quote-tweeted)
+- Preserve the founder's voice rhythm from the pillar
+- No hashtag spam, no emoji clutter (unless voice profile uses them)
+- No "1/", "2/" numbering inside the tweet body — those are for the LLM's output formatting only
 
-Output as numbered list, one tweet per line:
+OUTPUT FORMAT (numbered list, one tweet per line):
 
-1. [tweet 1 — the hook]
-2. [tweet 2]
+1. [hook tweet]
+2. [beat 1]
+3. [beat 2]
 ...
 
 No preamble. Thread only.`;
 }
 
-export function repurposeBlogPrompt(): string {
-  return `Repurpose the FINAL pillar (the revised version produced after QC, above in our conversation) into a long-form blog article.
+export function repurposeLinkedInPrompt(): string {
+  return `Repurpose the FINAL pillar (the revised version produced after QC, above in our conversation) into a LinkedIn-native short-form post.
+
+THIS IS NOT THE PILLAR SHORTENED. The pillar IS the long-form. This is a different format optimized for LinkedIn feed dynamics: punchier, heavy white space, designed for skim-reading.
 
 CONSTRAINTS:
-- 1200-1800 words (longer, deeper than the LinkedIn pillar)
-- Add: deeper context, more concrete examples, one diagram-equivalent description (e.g., "imagine X as Y"), one section that wasn't in the LinkedIn version
-- Use H2 section headers
-- Open with a question or scene, not a thesis
-- Close with a forward-looking implication
-- Voice: same founder voice, but with slightly more room to breathe — longer sentences allowed
+- 180-350 words total (vs the pillar's 600-900)
+- Line 1 = the hook. Must earn the "see more" click in LinkedIn's truncated feed view (LinkedIn shows ~2 lines before truncating).
+- HEAVY line breaks — each meaningful thought on its own line. White space is the design.
+- Build with rhythm: short line, short line, longer line, short line. Mirror the pillar's voice but compress.
+- Include ONE specific concrete anchor (a number, a name, a dated detail) — credibility weight
+- Close with a question or memorable observation that drives comment engagement
 
-Output as markdown with H2 headers. No preamble.`;
+STRUCTURE:
+- Line 1: punchy hook (one of the pillar's sharpest lines, or distill its central claim)
+- Skip a line. Deliver the core observation in 2-3 short paragraphs.
+- The concrete anchor — one specific detail
+- One short paragraph that lands the doctrine or asymmetric move
+- Close: question, memorable line, or doctrine principle (pick one — don't stack)
+
+VOICE: Same founder voice as the pillar — same anti-patterns, same signature moves, same register. Just compressed.
+
+NO bullets unless they're earning their place. NO listicles. NO emojis (unless voice profile uses them). NO hashtag walls. ONE hashtag at the bottom max — usually no hashtags at all.
+
+OUTPUT: post body only, with line breaks preserved. No preamble.`;
 }
 
 export function repurposeNewsletterPrompt(): string {
@@ -321,18 +352,40 @@ CONSTRAINTS:
 Output as markdown. No preamble.`;
 }
 
-export function repurposeVideoScriptPrompt(): string {
-  return `Repurpose the FINAL pillar (the revised version produced after QC, above in our conversation) into a short-form video script (60-90 seconds).
+export function repurposePullQuotesPrompt(): string {
+  return `Repurpose the FINAL pillar (the revised version produced after QC, above in our conversation) into 5 standalone pull quotes — text that could become quote cards, social graphics, or pinned replies.
 
-CONSTRAINTS:
-- Spoken voice — write to be read aloud, not silently read
-- Time-stamped sections: [00:00], [00:15], [00:30], etc.
-- Open with a 1-2 second hook line
-- Pace: ~150 words per minute, so ~150-225 words total
-- Include 2-3 [B-ROLL: ...] cues for what's on screen during the spoken line
-- Close with a single memorable line (the equivalent of the LinkedIn close)
+EACH QUOTE MUST:
+- Stand alone — no context needed for the line to land
+- 80-180 characters each (fits as image text without overflow)
+- Be quotable — would survive being shared with no attribution context
+- Be specific — named thing, number, concrete observation, sharp metaphor. Abstract takes don't share.
+- Carry the founder's voice fingerprint
 
-Output as markdown script. No preamble.`;
+WHAT TO MINE FROM THE PILLAR:
+- The sharpest observation
+- The most counterintuitive claim
+- A concrete detail that crystallizes the argument
+- The piece's mic-drop close, if it has one
+- The doctrine line, if it lands quotably
+- The asymmetric move stated as a flat assertion
+
+FORBIDDEN:
+- Quotes that require context to land ("This is why X" without the X being clear)
+- Generic statements ("AI is changing everything")
+- Quotes longer than 180 chars — they don't fit on a card and lose punch
+- Anything with hedging ("perhaps", "might", "could be")
+
+OUTPUT FORMAT:
+5 quotes, numbered, each on its own line, in quotes. No commentary.
+
+1. "[quote 1]"
+2. "[quote 2]"
+3. "[quote 3]"
+4. "[quote 4]"
+5. "[quote 5]"
+
+No preamble.`;
 }
 
 // ─── Generic Claude baseline (for three-way blind test) ────

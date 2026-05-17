@@ -16,9 +16,9 @@ const STEP_LABELS: Record<PipelineStep, string> = {
   qc: 'QC + anti-AI-slop',
   revised_pillar: 'Revised pillar',
   repurpose_x_thread: 'X thread',
-  repurpose_blog: 'Blog / long-form',
+  repurpose_linkedin: 'LinkedIn (native)',
   repurpose_newsletter: 'Newsletter',
-  repurpose_video_script: 'Video script',
+  repurpose_pull_quotes: 'Pull quotes',
 };
 
 // Steps whose output is prose meant for human reading — renders with
@@ -26,20 +26,8 @@ const STEP_LABELS: Record<PipelineStep, string> = {
 const PROSE_STEPS: PipelineStep[] = [
   'draft_pillar',
   'revised_pillar',
-  'repurpose_blog',
+  'repurpose_linkedin',
   'repurpose_newsletter',
-];
-
-const GENERATION_STEPS: PipelineStep[] = [
-  'niche_patterns',
-  'gap_analysis',
-  'brief',
-  'draft_pillar',
-  'qc',
-  'repurpose_x_thread',
-  'repurpose_blog',
-  'repurpose_newsletter',
-  'repurpose_video_script',
 ];
 
 type StepState = 'pending' | 'in_progress' | 'completed' | 'failed';
@@ -97,9 +85,9 @@ const DRAFT_STEPS: PipelineStep[] = [
 
 const VARIATION_STEPS: PipelineStep[] = [
   'repurpose_x_thread',
-  'repurpose_blog',
+  'repurpose_linkedin',
   'repurpose_newsletter',
-  'repurpose_video_script',
+  'repurpose_pull_quotes',
 ];
 
 function hookChipClass(hookStyle: string): string {
