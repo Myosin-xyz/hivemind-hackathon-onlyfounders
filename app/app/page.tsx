@@ -39,9 +39,10 @@ export default function AppHome() {
               </p>
               <Link
                 href="/onboard"
-                className="mt-6 inline-flex rounded-full bg-of-blue px-5 py-2 text-sm font-medium uppercase tracking-wider text-white transition-colors hover:bg-of-blue/85"
+                className="group mt-6 inline-flex items-center gap-2 rounded-full bg-of-blue px-5 py-2 text-sm font-medium uppercase tracking-wider text-white transition-colors hover:bg-of-pink"
               >
                 Onboard your first founder
+                <span aria-hidden className="transition-transform group-hover:translate-x-0.5">→</span>
               </Link>
             </div>
           ) : (
@@ -72,9 +73,10 @@ export default function AppHome() {
                     </Link>
                     <Link
                       href={`/generate?founderId=${f.id}`}
-                      className="rounded-full bg-of-blue px-4 py-1.5 text-xs font-medium uppercase tracking-wider text-white transition-colors hover:bg-of-blue/85"
+                      className="group inline-flex items-center gap-1.5 rounded-full bg-of-blue px-4 py-1.5 text-xs font-medium uppercase tracking-wider text-white transition-colors hover:bg-of-pink"
                     >
-                      Run the pipeline →
+                      Run the pipeline
+                      <span aria-hidden className="transition-transform group-hover:translate-x-0.5">→</span>
                     </Link>
                   </div>
                 </li>

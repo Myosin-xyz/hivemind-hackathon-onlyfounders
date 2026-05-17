@@ -8,7 +8,9 @@ const SIZE_CLASS: Record<Size, string> = {
   sm:   'text-2xl',                              // ~24px — inline contexts
   md:   'text-4xl',                              // ~36px — page header
   lg:   'text-6xl md:text-7xl',                  // ~60-72px — section hero
-  hero: 'text-7xl md:text-[8rem] lg:text-[10rem]', // monument scale for landing
+  // Monument scale that fits the viewport. clamp() caps at 7rem (~112px)
+  // even on ultrawide screens — earlier 10rem overflowed the container.
+  hero: 'text-[clamp(2.75rem,11vw,7rem)]',
 };
 
 const TAGLINE_CLASS: Record<Size, string> = {

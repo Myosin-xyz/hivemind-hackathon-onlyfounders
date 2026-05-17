@@ -27,14 +27,12 @@ export default function CoverPage() {
         <div className="mt-14 flex flex-col items-center gap-5 sm:flex-row sm:items-baseline sm:gap-8">
           <Link
             href="/app"
-            className="group relative inline-flex items-center gap-3 rounded-full bg-of-blue px-7 py-4 shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_18px_44px_-12px_rgba(26,109,255,0.55)] transition-[background-color,box-shadow,transform] duration-200 hover:translate-y-[-1px] hover:bg-of-pink hover:shadow-[0_0_0_1px_rgba(255,255,255,0.14),0_24px_56px_-12px_rgba(255,61,127,0.6)]"
+            className="group inline-flex items-center gap-2.5 rounded-full bg-of-blue px-6 py-3 text-sm font-medium uppercase tracking-[0.14em] text-white transition-colors duration-200 hover:bg-of-pink"
           >
-            <span className="text-sm font-medium uppercase tracking-[0.14em] text-white">
-              Enter the app
-            </span>
+            <span>Enter the app</span>
             <span
               aria-hidden
-              className="text-white transition-transform duration-200 group-hover:translate-x-1"
+              className="transition-transform duration-200 group-hover:translate-x-1"
             >
               →
             </span>

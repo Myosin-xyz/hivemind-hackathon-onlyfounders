@@ -528,6 +528,30 @@ function GeneratePageInner() {
         {/* ─── Step 1: Trends + Angle (single column, angles inline on cards) ─── */}
         {activeStep === 'trends_angle' && (
           <div className="space-y-6">
+            {/* Top continue bar — visible the moment an angle is picked, so the
+                user doesn't have to scroll back down to commit. Sticks just
+                under the step nav. */}
+            {anglePicked && (
+              <div className="sticky top-2 z-20 flex items-center justify-between gap-4 rounded-full border border-of-blue/30 bg-of-blue/10 px-4 py-2 backdrop-blur-sm">
+                <div className="flex min-w-0 flex-1 items-center gap-3">
+                  <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-of-blue/80">
+                    Angle picked
+                  </span>
+                  <span className="truncate text-sm text-white/85">
+                    {selectedAngle || customAngle}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveStep('draft')}
+                  className="group inline-flex shrink-0 items-center gap-1.5 rounded-full bg-of-blue px-4 py-1.5 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-white transition-colors hover:bg-of-pink"
+                >
+                  Continue to Draft
+                  <span aria-hidden className="transition-transform group-hover:translate-x-0.5">→</span>
+                </button>
+              </div>
+            )}
+
             <section>
               <h2 className="mb-2 text-lg font-semibold">Trends + Angle</h2>
               <p className="mb-3 text-sm text-neutral-400">
@@ -651,19 +675,23 @@ function GeneratePageInner() {
               )}
             </section>
 
-            {/* Step 1 footer — selected angle + custom input + Continue */}
-            <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-4 space-y-3">
+            {/* Step 1 footer — selected angle + custom input + Continue.
+                Top sticky bar handles the primary continue path; this block
+                stays for the custom-angle input. */}
+            <div className="rounded-lg border border-white/8 bg-white/[0.02] p-4 space-y-3">
               <div className="flex items-center justify-between gap-4">
                 <div className="min-w-0 flex-1">
                   {anglePicked ? (
                     <>
-                      <div className="mb-1 text-xs text-neutral-500">Selected angle</div>
-                      <div className="text-sm text-neutral-100">
+                      <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">
+                        Selected angle
+                      </div>
+                      <div className="text-sm text-white/85">
                         {selectedAngle || customAngle}
                       </div>
                     </>
                   ) : (
-                    <div className="text-sm text-neutral-500">
+                    <div className="text-sm text-white/50">
                       Click an angle chip above, or write your own below
                     </div>
                   )}
@@ -672,14 +700,15 @@ function GeneratePageInner() {
                   type="button"
                   onClick={() => setActiveStep('draft')}
                   disabled={!anglePicked}
-                  className="whitespace-nowrap rounded-md bg-white px-5 py-2.5 text-sm font-medium text-black hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="group inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-of-blue px-5 py-2.5 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-white transition-colors hover:bg-of-pink disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/30"
                 >
-                  Continue to Draft →
+                  Continue to Draft
+                  <span aria-hidden className="transition-transform group-hover:translate-x-0.5">→</span>
                 </button>
               </div>
               <div>
-                <label className="mb-1 block text-xs text-neutral-500">
-                  Or type your own angle (anchored to ONE signal — keep it tight):
+                <label className="mb-1 block font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">
+                  Or type your own angle (anchored to ONE signal, keep it tight):
                 </label>
                 <input
                   type="text"
