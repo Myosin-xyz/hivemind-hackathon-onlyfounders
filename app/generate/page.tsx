@@ -90,6 +90,15 @@ const VARIATION_STEPS: PipelineStep[] = [
   'repurpose_pull_quotes',
 ];
 
+// Steps whose output is markdown (headers, lists, bold). Rendered with the
+// MarkdownView component instead of <pre>monospace</pre>.
+const MARKDOWN_STEPS: PipelineStep[] = ['brief', 'qc'];
+
+function formatElapsed(ms: number): string {
+  const sec = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+}
+
 function hookChipClass(hookStyle: string): string {
   switch (hookStyle) {
     case 'provocative':
@@ -143,10 +152,21 @@ function GeneratePageInner() {
 
   const [stepStates, setStepStates] = useState<Record<string, StepState>>({});
   const [stepOutputs, setStepOutputs] = useState<Record<string, string>>({});
+  const [stepStartedAt, setStepStartedAt] = useState<Record<string, number>>({});
+  const [, setTick] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<PipelineStep>('draft_pillar');
 
   const abortRef = useRef<AbortController | null>(null);
+
+  // Tick every second while a step is in_progress so elapsed labels update.
+  // Cleans up the moment everything settles back to completed/failed/pending.
+  useEffect(() => {
+    const anyRunning = Object.values(stepStates).includes('in_progress');
+    if (!anyRunning) return;
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [stepStates]);
 
   useEffect(() => {
     if (!founderId) return;
@@ -333,6 +353,7 @@ function GeneratePageInner() {
     }
     if (event.type === 'step_started') {
       setStepStates((s) => ({ ...s, [event.step]: 'in_progress' }));
+      setStepStartedAt((s) => ({ ...s, [event.step]: Date.now() }));
     } else if (event.type === 'step_completed') {
       setStepStates((s) => ({ ...s, [event.step]: 'completed' }));
       setStepOutputs((s) => ({ ...s, [event.step]: event.output }));
@@ -662,11 +683,12 @@ function GeneratePageInner() {
 
                 {/* 2-column: pipeline (30%) + output viewer (70%) */}
                 {(draftRunning || draftComplete) && (
-                  <div className="grid grid-cols-1 gap-6 lg:grid-cols-[3fr_7fr]">
+                  <div className="grid grid-cols-1 gap-6 md:grid-cols-[3fr_7fr]">
                     <PipelineList
                       steps={draftStepsForList}
                       stepStates={stepStates}
                       stepOutputs={stepOutputs}
+                      stepStartedAt={stepStartedAt}
                       setActiveTab={setActiveTab}
                     />
                     <OutputViewer
@@ -685,14 +707,24 @@ function GeneratePageInner() {
                 )}
 
                 {/* Actions at bottom — after the user has read */}
-                {draftRunning && (
-                  <button
-                    disabled
-                    className="w-full rounded-md bg-neutral-700 px-6 py-3 font-medium text-neutral-300"
-                  >
-                    Generating draft… (~2-3 min)
-                  </button>
-                )}
+                {draftRunning && (() => {
+                  const current = draftStepsForList.find((s) => stepStates[s] === 'in_progress');
+                  const idx = current ? draftStepsForList.indexOf(current) : -1;
+                  const elapsed = current && stepStartedAt[current]
+                    ? formatElapsed(Date.now() - stepStartedAt[current])
+                    : null;
+                  const label = current
+                    ? `Generating · ${STEP_LABELS[current]} · step ${idx + 1} of ${draftStepsForList.length}${elapsed ? ` · ${elapsed}` : ''}`
+                    : 'Generating draft… (~2-3 min)';
+                  return (
+                    <button
+                      disabled
+                      className="w-full rounded-md bg-neutral-700 px-6 py-3 font-medium text-neutral-300"
+                    >
+                      {label}
+                    </button>
+                  );
+                })()}
                 {draftComplete && !draftRunning && (
                   <div className="flex gap-2">
                     <button
@@ -740,11 +772,12 @@ function GeneratePageInner() {
 
                 {/* 2-column: pipeline (30%) + output viewer (70%) */}
                 {(variationsRunning || variationsComplete) && (
-                  <div className="grid grid-cols-1 gap-6 lg:grid-cols-[3fr_7fr]">
+                  <div className="grid grid-cols-1 gap-6 md:grid-cols-[3fr_7fr]">
                     <PipelineList
                       steps={VARIATION_STEPS}
                       stepStates={stepStates}
                       stepOutputs={stepOutputs}
+                      stepStartedAt={stepStartedAt}
                       setActiveTab={setActiveTab}
                     />
                     <OutputViewer
@@ -763,14 +796,24 @@ function GeneratePageInner() {
                 )}
 
                 {/* Actions at bottom */}
-                {variationsRunning && (
-                  <button
-                    disabled
-                    className="w-full rounded-md bg-neutral-700 px-6 py-3 font-medium text-neutral-300"
-                  >
-                    Generating variations… (~1-2 min)
-                  </button>
-                )}
+                {variationsRunning && (() => {
+                  const current = VARIATION_STEPS.find((s) => stepStates[s] === 'in_progress');
+                  const idx = current ? VARIATION_STEPS.indexOf(current) : -1;
+                  const elapsed = current && stepStartedAt[current]
+                    ? formatElapsed(Date.now() - stepStartedAt[current])
+                    : null;
+                  const label = current
+                    ? `Generating · ${STEP_LABELS[current]} · step ${idx + 1} of ${VARIATION_STEPS.length}${elapsed ? ` · ${elapsed}` : ''}`
+                    : 'Generating variations… (~1-2 min)';
+                  return (
+                    <button
+                      disabled
+                      className="w-full rounded-md bg-neutral-700 px-6 py-3 font-medium text-neutral-300"
+                    >
+                      {label}
+                    </button>
+                  );
+                })()}
                 {variationsComplete && !variationsRunning && (
                   <div className="space-y-2">
                     <div className="rounded-md border border-green-900/50 bg-green-950/20 px-4 py-3 text-sm text-green-300">
@@ -821,25 +864,32 @@ function PipelineList({
   steps,
   stepStates,
   stepOutputs,
+  stepStartedAt,
   setActiveTab,
 }: {
   steps: PipelineStep[];
   stepStates: Record<string, StepState>;
   stepOutputs: Record<string, string>;
+  stepStartedAt: Record<string, number>;
   setActiveTab: (s: PipelineStep) => void;
 }) {
   return (
-    <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
+    <div className="rounded-lg border border-neutral-800 bg-neutral-900/60 p-4">
       <h3 className="mb-3 text-sm font-semibold text-neutral-300">Pipeline</h3>
       <ul className="space-y-1.5">
         {steps.map((step) => {
           const state = stepStates[step] ?? 'pending';
+          const hasOutput = !!stepOutputs[step];
+          const elapsed =
+            state === 'in_progress' && stepStartedAt[step]
+              ? formatElapsed(Date.now() - stepStartedAt[step])
+              : null;
           return (
             <li
               key={step}
-              onClick={() => stepOutputs[step] && setActiveTab(step)}
-              className={`flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm ${
-                stepOutputs[step] ? 'hover:bg-neutral-800/50' : ''
+              onClick={() => hasOutput && setActiveTab(step)}
+              className={`flex items-center gap-2 rounded px-2 py-1 text-sm transition-colors ${
+                hasOutput ? 'cursor-pointer hover:bg-neutral-800/50' : 'cursor-default'
               }`}
             >
               <StateIcon state={state} />
@@ -856,6 +906,11 @@ function PipelineList({
               >
                 {STEP_LABELS[step]}
               </span>
+              {elapsed && (
+                <span className="ml-auto font-mono text-xs text-blue-400 tabular-nums">
+                  {elapsed}
+                </span>
+              )}
             </li>
           );
         })}
@@ -903,7 +958,9 @@ function OutputViewer({
       </div>
       <div className="max-h-[70vh] overflow-y-auto rounded-lg border border-neutral-800 bg-neutral-900 p-6">
         {isActiveTabRelevant ? (
-          PROSE_STEPS.includes(activeTab) ? (
+          MARKDOWN_STEPS.includes(activeTab) ? (
+            <MarkdownView content={stepOutputs[activeTab]} />
+          ) : PROSE_STEPS.includes(activeTab) ? (
             <div className="max-w-prose space-y-4 text-[15px] leading-relaxed text-neutral-100">
               {stepOutputs[activeTab]
                 .split(/\n\n+/)
@@ -1148,9 +1205,107 @@ function AngleChips({
 }
 
 function StateIcon({ state }: { state: StepState }) {
-  if (state === 'completed') return <span className="text-green-500">✓</span>;
-  if (state === 'in_progress')
-    return <span className="text-blue-400 animate-pulse">●</span>;
-  if (state === 'failed') return <span className="text-red-400">✗</span>;
-  return <span className="text-neutral-600">○</span>;
+  if (state === 'completed') {
+    return (
+      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-green-600/20 text-green-400">
+        <svg viewBox="0 0 12 12" className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="2 6 5 9 10 3" />
+        </svg>
+      </span>
+    );
+  }
+  if (state === 'in_progress') {
+    return (
+      <span className="relative flex h-3 w-3 items-center justify-center">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-500 opacity-60" />
+        <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-500" />
+      </span>
+    );
+  }
+  if (state === 'failed') {
+    return (
+      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-red-600/20 text-red-400">
+        <svg viewBox="0 0 12 12" className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+          <line x1="3" y1="3" x2="9" y2="9" />
+          <line x1="9" y1="3" x2="3" y2="9" />
+        </svg>
+      </span>
+    );
+  }
+  return <span className="block h-2 w-2 rounded-full border border-neutral-600" />;
+}
+
+// Tiny inline markdown renderer for brief and qc outputs.
+// Handles: headers (##, ###, ####), bullet lists (- or *), paragraphs,
+// inline bold (**...**), italic (*...*), and inline code (`...`).
+// Anything fancier is rendered as plain text.
+function MarkdownView({ content }: { content: string }) {
+  type Block =
+    | { kind: 'h2' | 'h3' | 'h4'; text: string }
+    | { kind: 'ul'; items: string[] }
+    | { kind: 'p'; text: string };
+
+  const blocks: Block[] = (() => {
+    const out: Block[] = [];
+    let list: string[] = [];
+    let para: string[] = [];
+    const flushList = () => {
+      if (list.length) { out.push({ kind: 'ul', items: list }); list = []; }
+    };
+    const flushPara = () => {
+      if (para.length) { out.push({ kind: 'p', text: para.join(' ') }); para = []; }
+    };
+    const flushAll = () => { flushList(); flushPara(); };
+
+    for (const raw of content.split('\n')) {
+      const line = raw.trim();
+      if (!line) { flushAll(); continue; }
+      let m: RegExpExecArray | null;
+      if ((m = /^####\s+(.+)$/.exec(line))) { flushAll(); out.push({ kind: 'h4', text: m[1] }); continue; }
+      if ((m = /^###\s+(.+)$/.exec(line))) { flushAll(); out.push({ kind: 'h3', text: m[1] }); continue; }
+      if ((m = /^#{1,2}\s+(.+)$/.exec(line))) { flushAll(); out.push({ kind: 'h2', text: m[1] }); continue; }
+      if ((m = /^[-*]\s+(.+)$/.exec(line))) { flushPara(); list.push(m[1]); continue; }
+      flushList();
+      para.push(line);
+    }
+    flushAll();
+    return out;
+  })();
+
+  function inline(text: string): React.ReactNode {
+    const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
+    return parts.map((p, i) => {
+      if (/^\*\*[^*]+\*\*$/.test(p)) {
+        return <strong key={i} className="font-semibold text-white">{p.slice(2, -2)}</strong>;
+      }
+      if (/^`[^`]+`$/.test(p)) {
+        return <code key={i} className="rounded bg-neutral-800 px-1 py-0.5 text-[13px]">{p.slice(1, -1)}</code>;
+      }
+      return <span key={i}>{p}</span>;
+    });
+  }
+
+  return (
+    <div className="max-w-prose text-[15px] leading-relaxed text-neutral-100">
+      {blocks.map((b, i) => {
+        if (b.kind === 'h2') {
+          return <h2 key={i} className="mt-6 mb-2 text-xl font-semibold text-white first:mt-0">{inline(b.text)}</h2>;
+        }
+        if (b.kind === 'h3') {
+          return <h3 key={i} className="mt-4 mb-1.5 text-base font-semibold text-white first:mt-0">{inline(b.text)}</h3>;
+        }
+        if (b.kind === 'h4') {
+          return <h4 key={i} className="mt-3 mb-1 text-xs font-semibold uppercase tracking-wide text-neutral-400 first:mt-0">{inline(b.text)}</h4>;
+        }
+        if (b.kind === 'ul') {
+          return (
+            <ul key={i} className="my-2 list-disc space-y-1 pl-5 text-neutral-200">
+              {b.items.map((item, j) => <li key={j}>{inline(item)}</li>)}
+            </ul>
+          );
+        }
+        return <p key={i} className="my-2 whitespace-pre-wrap">{inline(b.text)}</p>;
+      })}
+    </div>
+  );
 }
