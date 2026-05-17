@@ -3,9 +3,9 @@ import { NextRequest, NextResponse } from 'next/server';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-// Generic-Claude baseline for the three-way blind test.
+// Generic-Claude baseline for the blind test, paired against Only Founders.
 // Same topic, no founder grounding, no signal, no frameworks.
-// Output is "A" in the A/B/C comparison.
+// Output is "A" in the A/B comparison.
 type BaselineRequestBody = {
   topic: string;
 };

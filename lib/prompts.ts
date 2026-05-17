@@ -388,7 +388,7 @@ OUTPUT FORMAT:
 No preamble.`;
 }
 
-// ─── Generic Claude baseline (for three-way blind test) ────
+// ─── Generic Claude baseline (paired against Only Founders in /compare) ────
 
 export function baselineClaudePrompt(topic: string): string {
   return `Write a long-form LinkedIn post about ${topic}. Aim for 600-900 words. Make it engaging and authoritative.`;

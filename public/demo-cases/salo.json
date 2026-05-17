@@ -1,0 +1,6 @@
+{
+  "_note": "Pre-filled compare-page demo. Replace onlyFounders with the revised pillar output from /generate before the live demo. genericClaude can be left empty and will be auto-generated via /api/baseline on load.",
+  "topic": "Why most AI agents start from zero every session",
+  "genericClaude": "",
+  "onlyFounders": "[REPLACE BEFORE DEMO] Paste the revised pillar output from /generate for Salo on this topic. Run the full pipeline once before Monday and paste the result here."
+}

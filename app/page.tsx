@@ -77,9 +77,9 @@ export default function Home() {
             href="/compare"
             className="block rounded-lg border border-neutral-800 bg-neutral-900 p-6 hover:bg-neutral-800/50"
           >
-            <div className="text-lg font-medium">Three-way comparison →</div>
+            <div className="text-lg font-medium">Side-by-side comparison →</div>
             <div className="mt-1 text-sm text-neutral-400">
-              Generic AI vs founder's actual writing vs Only Founders. Can the room tell them apart?
+              Generic AI vs Only Founders, shuffled. Which one sounds like a real founder wrote it?
             </div>
           </Link>
         </section>
