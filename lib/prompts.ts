@@ -18,6 +18,37 @@ SAMPLES:
 ${samples.map((s, i) => `--- Sample ${i + 1} ---\n${s}`).join('\n\n')}`;
 }
 
+// Voice extraction from Beacon stylometry. Used when Beacon returned
+// quantitative profile data (formats, stylometry, etc.) but no
+// style_guide string we can use directly. We hand the raw numbers to
+// ghostwriter and ask it to interpret them into a real voice.md.
+export function voiceFromBeaconProfilePrompt(
+  handle: string,
+  profile: unknown,
+): string {
+  const profileJson = JSON.stringify(profile, null, 2);
+  const trimmed = profileJson.length > 5500 ? profileJson.slice(0, 5500) + '\n…[truncated]' : profileJson;
+  return `Produce a voice profile for @${handle} from this Beacon stylometry data.
+
+OUTPUT FORMAT — keep all section headers verbatim. Convert numbers into prose. Don't paste the raw JSON into the output. Quote example tokens (top emojis, opener/closer words, frequent n-grams) where they actually inform a section.
+
+INTERPRETATION GUIDE:
+- title_case_rate + all_caps_word_rate + lowercase_only_tweet_rate → register (casual vs polished)
+- top emoji list → tone signal (❤ 😭 = expressive/emotional, none = analytical)
+- openers / closers → recurring signature moves
+- char_length percentiles → default sentence rhythm (short vs long)
+- function_words frequencies → first/second person preference, modal patterns
+- common ngrams → pet phrases worth quoting in Lexical Fingerprint
+- ttr / mtld / long_word_rate → lexical density and variety
+
+Where Beacon data doesn't cover a section (Identity, Doctrine, Implied Reader), write best-effort inferences and mark them with "[inferred from limited Beacon data]" so the founder knows to refine later.
+
+${fillSchema(handle)}
+
+BEACON STYLOMETRY (raw):
+${trimmed}`;
+}
+
 // ─── Gap analysis (ported from Beacon's gap-miner.ts, augmented) ──
 
 export type GapAnalysisInput = {
