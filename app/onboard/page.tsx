@@ -140,7 +140,7 @@ export default function OnboardPage() {
     <main className="min-h-screen bg-neutral-950 text-neutral-100">
       <div className="mx-auto max-w-2xl px-6 py-12">
         <header className="mb-10">
-          <a href="/" className="text-sm text-neutral-400 hover:text-neutral-200">
+          <a href="/app" className="text-sm text-neutral-400 hover:text-neutral-200">
             ← Home
           </a>
           <h1 className="mt-3 text-3xl font-bold">Onboard founder</h1>

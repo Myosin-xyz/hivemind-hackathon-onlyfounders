@@ -375,7 +375,7 @@ function GeneratePageInner() {
     return (
       <main className="min-h-screen bg-neutral-950 text-neutral-100 p-8">
         <p>Missing founderId in URL.</p>
-        <a href="/" className="text-blue-400 hover:underline">← Home</a>
+        <a href="/app" className="text-blue-400 hover:underline">← Home</a>
       </main>
     );
   }
@@ -431,7 +431,7 @@ function GeneratePageInner() {
     <main className="min-h-screen bg-neutral-950 text-neutral-100">
       <div className="mx-auto max-w-7xl px-6 py-8">
         <header className="mb-6">
-          <a href="/" className="text-sm text-neutral-400 hover:text-neutral-200">
+          <a href="/app" className="text-sm text-neutral-400 hover:text-neutral-200">
             ← Home
           </a>
           <h1 className="mt-2 text-3xl font-bold">

@@ -99,7 +99,7 @@ export default function FounderPage({ params }: { params: Promise<{ id: string }
     return (
       <main className="min-h-screen bg-neutral-950 text-neutral-100 p-8">
         <p className="text-red-400">{error ?? 'Founder not found'}</p>
-        <Link href="/" className="mt-4 inline-block text-blue-400 hover:underline">
+        <Link href="/app" className="mt-4 inline-block text-blue-400 hover:underline">
           ← Home
         </Link>
       </main>
@@ -112,7 +112,7 @@ export default function FounderPage({ params }: { params: Promise<{ id: string }
   return (
     <main className="min-h-screen bg-neutral-950 text-neutral-100">
       <div className="mx-auto max-w-3xl px-6 py-12">
-        <Link href="/" className="text-sm text-neutral-400 hover:text-neutral-200">
+        <Link href="/app" className="text-sm text-neutral-400 hover:text-neutral-200">
           ← Home
         </Link>
 
