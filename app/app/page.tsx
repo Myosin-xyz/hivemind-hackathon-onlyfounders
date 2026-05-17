@@ -53,11 +53,12 @@ export default function AppHome() {
                 >
                   <div className="min-w-0">
                     <div className="truncate font-medium text-white">{f.name}</div>
-                    <div className="mt-0.5 truncate text-sm text-white/40">
-                      {f.websiteUrl}
+                    <div className="mt-0.5 flex flex-wrap items-center gap-2 text-sm text-white/40">
+                      <span className="truncate">{f.websiteUrl}</span>
                       {f.niche && (
-                        <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-white/30">
-                          · {f.niche}
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-of-orange/30 bg-of-orange/5 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-of-orange">
+                          <span className="block h-1 w-1 rounded-full bg-of-orange" />
+                          {f.niche}
                         </span>
                       )}
                     </div>

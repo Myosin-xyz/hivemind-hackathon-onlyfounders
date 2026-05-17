@@ -50,11 +50,26 @@ export default function CoverPage() {
           </Link>
         </div>
 
-        <div className="mt-24 flex flex-col items-center gap-3">
+        <div className="mt-24 flex flex-col items-center gap-4">
           <HivemindLockup variant="hero" />
-          <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-white/30">
-            One founder. One signal. One angle. Pillar plus four channel variations.
-          </p>
+          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-white/50">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="block h-1.5 w-1.5 rounded-full bg-of-blue" />
+              One founder
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="block h-1.5 w-1.5 rounded-full bg-of-orange" />
+              One signal
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="block h-1.5 w-1.5 rounded-full bg-of-gold" />
+              One angle
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="block h-1.5 w-1.5 rounded-full bg-of-green" />
+              Pillar + 4 variations
+            </span>
+          </div>
         </div>
       </div>
     </main>

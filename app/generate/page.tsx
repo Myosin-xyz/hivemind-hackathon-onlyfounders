@@ -120,20 +120,32 @@ function formatElapsed(ms: number): string {
   return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
 }
 
+// Hook style → brand semantic accent. Pink stays exclusive to the wordmark
+// per brand §1 ("one per screen"), so provocative gets gold instead.
 function hookChipClass(hookStyle: string): string {
   switch (hookStyle) {
     case 'provocative':
-      return 'border border-red-900/50 bg-red-950/40 text-red-300';
+      return 'border border-of-gold/40 bg-of-gold/10 text-of-gold';
     case 'contrarian':
-      return 'border border-amber-900/50 bg-amber-950/40 text-amber-300';
+      return 'border border-of-orange/40 bg-of-orange/10 text-of-orange';
     case 'insight':
-      return 'border border-blue-900/50 bg-blue-950/40 text-blue-300';
+      return 'border border-of-blue/40 bg-of-blue/10 text-of-blue';
     case 'story':
-      return 'border border-green-900/50 bg-green-950/40 text-green-300';
+      return 'border border-of-green/40 bg-of-green/10 text-of-green';
     default:
-      return 'border border-neutral-700 bg-neutral-800 text-neutral-300';
+      return 'border border-white/15 bg-white/[0.04] text-white/60';
   }
 }
+
+// Per-source brand color. Brand §6 specifies exact dot colors for signal feeds.
+// Reddit/HN both fall in the orange family per spec — collapsing to of-orange.
+// Polymarket → of-blue. Beacon-X → white/60 (subtle, signals external X feed).
+const SOURCE_DOT: Record<string, string> = {
+  reddit:     'bg-of-orange',
+  hackernews: 'bg-of-orange',
+  polymarket: 'bg-of-blue',
+  'beacon-x': 'bg-white/60',
+};
 
 export default function GeneratePage() {
   return (
@@ -561,21 +573,25 @@ function GeneratePageInner() {
               {trendBrief && (
                 <>
                   <div className="mb-2 flex flex-wrap items-center gap-1.5 text-xs">
-                    <span className="text-neutral-500">
-                      {trendBrief.raw_count} signals · grounded in:
+                    <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-white/40">
+                      {trendBrief.raw_count} signals · grounded in
                     </span>
                     {trendBrief.hivemind_grounded && (
-                      <span className="rounded border border-blue-900/50 bg-blue-950/40 px-2 py-0.5 text-blue-300">
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-of-blue/40 bg-of-blue/10 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-of-blue">
+                        <span className="block h-1.5 w-1.5 rounded-full bg-of-blue" />
                         Hivemind project context
                       </span>
                     )}
                     {Object.entries(countBySource(trendBrief.signals)).map(([src, count]) => (
                       <span
                         key={src}
-                        className="rounded border border-neutral-700 bg-neutral-800 px-2 py-0.5 text-neutral-300"
+                        className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-white/70"
                       >
-                        {SOURCE_LABELS[src] ?? src}{' '}
-                        <span className="text-neutral-500">({count})</span>
+                        <span
+                          className={`block h-1.5 w-1.5 rounded-full ${SOURCE_DOT[src] ?? 'bg-white/40'}`}
+                        />
+                        {SOURCE_LABELS[src] ?? src}
+                        <span className="text-white/35">({count})</span>
                       </span>
                     ))}
                   </div>
@@ -944,12 +960,12 @@ function EmptyState({
   onCtaClick: () => void;
 }) {
   return (
-    <div className="rounded-lg border border-amber-900/50 bg-amber-950/20 p-6 text-center">
-      <p className="mb-3 text-sm text-amber-300">{message}</p>
+    <div className="rounded-lg border border-of-orange/30 bg-of-orange/5 p-6 text-center">
+      <p className="mb-3 text-sm text-of-orange/90">{message}</p>
       <button
         type="button"
         onClick={onCtaClick}
-        className="rounded-md border border-amber-700 px-4 py-2 text-sm text-amber-200 hover:bg-amber-950/50"
+        className="rounded-full border border-of-orange/40 px-4 py-2 font-mono text-xs font-medium uppercase tracking-[0.12em] text-of-orange transition-colors hover:bg-of-orange/10"
       >
         {cta}
       </button>
@@ -1230,15 +1246,15 @@ function BriefRenderer({
           {parsed.whitespace.map((w) => (
             <article
               key={w.number}
-              className="rounded-lg border border-amber-900/40 bg-amber-950/10 p-3"
+              className="rounded-lg border border-of-orange/30 bg-of-orange/5 p-3"
             >
-              <h4 className="mb-1.5 flex items-baseline gap-2 text-sm font-medium text-amber-100">
-                <span className="font-mono text-xs text-amber-500/70">
+              <h4 className="mb-1.5 flex items-baseline gap-2 text-sm font-medium text-of-orange">
+                <span className="font-mono text-xs text-of-orange/60">
                   {w.number}.
                 </span>
                 <span>{w.title}</span>
               </h4>
-              <p className="mb-2 text-xs leading-relaxed text-amber-200/80 whitespace-pre-wrap">
+              <p className="mb-2 text-xs leading-relaxed text-of-orange/75 whitespace-pre-wrap">
                 {w.body}
               </p>
               <AngleChips
@@ -1253,11 +1269,11 @@ function BriefRenderer({
       )}
 
       {parsed.weakAssumption && (
-        <div className="rounded-md border border-red-900/40 bg-red-950/20 p-3 text-xs">
-          <div className="mb-1 font-semibold uppercase tracking-wide text-red-400">
+        <div className="rounded-md border border-of-pink/30 bg-of-pink/5 p-3 text-xs">
+          <div className="mb-1 font-mono font-semibold uppercase tracking-wide text-of-pink">
             ⚠ Weakest assumption
           </div>
-          <p className="text-red-200/90">{parsed.weakAssumption}</p>
+          <p className="text-of-pink/85">{parsed.weakAssumption}</p>
         </div>
       )}
     </div>
@@ -1280,8 +1296,8 @@ function AngleChips({
 }) {
   if (!angles || angles.length === 0) return null;
   return (
-    <div className={`mt-2 space-y-1.5 border-t ${amber ? 'border-amber-900/30' : 'border-neutral-800'} pt-2`}>
-      <div className={`text-[10px] font-semibold uppercase tracking-wide ${amber ? 'text-amber-500/70' : 'text-neutral-500'}`}>
+    <div className={`mt-2 space-y-1.5 border-t ${amber ? 'border-of-orange/25' : 'border-white/10'} pt-2`}>
+      <div className={`font-mono text-[10px] font-medium uppercase tracking-[0.12em] ${amber ? 'text-of-orange/70' : 'text-white/40'}`}>
         Angle suggestions
       </div>
       <div className="space-y-1">
