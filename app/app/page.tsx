@@ -39,7 +39,7 @@ export default function AppHome() {
               </p>
               <Link
                 href="/onboard"
-                className="group mt-6 inline-flex items-center gap-2 rounded-full bg-of-blue px-5 py-2 text-sm font-medium uppercase tracking-wider text-white transition-colors hover:bg-of-pink"
+                className="group mt-6 inline-flex items-center gap-2 rounded-full border border-of-blue/50 bg-of-blue/[0.08] px-5 py-2 text-sm font-medium uppercase tracking-wider text-of-blue transition-[background-color,border-color,color] hover:border-of-pink hover:bg-of-pink hover:text-white"
               >
                 Onboard your first founder
                 <span aria-hidden className="transition-transform group-hover:translate-x-0.5">→</span>
@@ -73,7 +73,7 @@ export default function AppHome() {
                     </Link>
                     <Link
                       href={`/generate?founderId=${f.id}`}
-                      className="group inline-flex items-center gap-1.5 rounded-full bg-of-blue px-4 py-1.5 text-xs font-medium uppercase tracking-wider text-white transition-colors hover:bg-of-pink"
+                      className="group inline-flex items-center gap-1.5 rounded-full border border-of-blue/50 bg-of-blue/[0.08] px-4 py-1.5 text-xs font-medium uppercase tracking-wider text-of-blue transition-[background-color,border-color,color] hover:border-of-pink hover:bg-of-pink hover:text-white"
                     >
                       Run the pipeline
                       <span aria-hidden className="transition-transform group-hover:translate-x-0.5">→</span>

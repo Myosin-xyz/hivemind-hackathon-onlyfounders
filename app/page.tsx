@@ -21,18 +21,18 @@ export default function CoverPage() {
           <span className="text-white/45">Not &ldquo;in their voice.&rdquo; Theirs.</span>
         </p>
 
-        {/* Primary CTA leans into brand personality: 01 prefix echoes the stage
-            tab pattern, larger pad, accent arrow that slides on hover, pink
-            underline glow on focus. Secondary recedes to a quiet text link. */}
+        {/* Primary CTA: outline at rest, fills with brand pink on hover.
+            Less "look at me button," more "designed entry point." The brand
+            color moment is the wink (hover state), not the resting state. */}
         <div className="mt-14 flex flex-col items-center gap-5 sm:flex-row sm:items-baseline sm:gap-8">
           <Link
             href="/app"
-            className="group inline-flex items-center gap-2.5 rounded-full bg-of-blue px-6 py-3 text-sm font-medium uppercase tracking-[0.14em] text-white transition-colors duration-200 hover:bg-of-pink"
+            className="group inline-flex items-center gap-3 rounded-full border border-white/25 bg-white/[0.02] px-6 py-3 text-sm font-medium uppercase tracking-[0.14em] text-white transition-[background-color,border-color,color] duration-200 hover:border-of-pink hover:bg-of-pink hover:text-white"
           >
             <span>Enter the app</span>
             <span
               aria-hidden
-              className="transition-transform duration-200 group-hover:translate-x-1"
+              className="text-white/60 transition-[transform,color] duration-200 group-hover:translate-x-1 group-hover:text-white"
             >
               →
             </span>
