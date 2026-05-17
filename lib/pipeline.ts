@@ -18,6 +18,70 @@ export type PipelineCallbacks = {
   onEvent?: (event: PipelineEvent) => void | Promise<void>;
 };
 
+// Pull a usable style guide out of a Beacon voice-analyze result, even when
+// the canonical profile.style_guide field is missing. Order of preference:
+//   1. profile.style_guide (the documented happy path)
+//   2. any top-level string field on result that looks like a style guide
+//   3. synthesize a minimal markdown profile from formats / stylometry
+// Returns null when there's nothing usable.
+function extractStyleGuide(result: beacon.VoiceAnalyzeStatus, handle: string): string | null {
+  const profile = result.profile;
+
+  // 1. direct happy path
+  if (typeof profile?.style_guide === 'string' && profile.style_guide.trim().length > 50) {
+    return profile.style_guide;
+  }
+
+  // 2. some Beacon responses surface a top-level string instead of nesting
+  //    it under profile. Look for likely candidates.
+  const raw = result as unknown as Record<string, unknown>;
+  for (const key of ['style_guide', 'styleGuide', 'voice_md', 'voiceMd', 'voice_profile']) {
+    const v = raw[key];
+    if (typeof v === 'string' && v.trim().length > 50) return v;
+  }
+
+  // 3. synthesize a minimal markdown profile from whatever IS present.
+  //    Better than crashing — gives the downstream ghostwriter at least
+  //    some structural voice signal even when Beacon's style_guide is
+  //    missing or malformed.
+  if (!profile) return null;
+
+  const lines: string[] = [`# Voice Profile (extracted from @${handle} via Beacon)`, ''];
+  let added = 0;
+
+  if (profile.formats?.length) {
+    lines.push('## Signature Moves');
+    for (const f of profile.formats.slice(0, 6)) {
+      if (typeof f?.name !== 'string') continue;
+      lines.push(`- **${f.name}**`);
+      const ex = Array.isArray(f.examples) ? f.examples.filter((e): e is string => typeof e === 'string').slice(0, 2) : [];
+      for (const e of ex) lines.push(`  - ${e.length > 240 ? e.slice(0, 240) + '…' : e}`);
+      added += 1;
+    }
+    lines.push('');
+  }
+
+  if (profile.stylometry && Object.keys(profile.stylometry).length > 0) {
+    lines.push('## Lexical Fingerprint');
+    for (const [k, v] of Object.entries(profile.stylometry).slice(0, 10)) {
+      if (v === null || v === undefined) continue;
+      const formatted = typeof v === 'object' ? JSON.stringify(v) : String(v);
+      lines.push(`- **${k}**: ${formatted.length > 160 ? formatted.slice(0, 160) + '…' : formatted}`);
+      added += 1;
+    }
+    lines.push('');
+  }
+
+  if (typeof profile.completeness === 'number' || typeof profile.confidence === 'number') {
+    lines.push('## Beacon Metadata');
+    if (typeof profile.completeness === 'number') lines.push(`- completeness: ${profile.completeness}`);
+    if (typeof profile.confidence === 'number') lines.push(`- confidence: ${profile.confidence}`);
+  }
+
+  // Only return if we actually built something with substance.
+  return added > 0 ? lines.join('\n') : null;
+}
+
 async function emit(
   callbacks: PipelineCallbacks | undefined,
   event: PipelineEvent,
@@ -103,21 +167,35 @@ export async function runOnboarding(
     // status='complete' immediately (and a sentinel analysis_id we shouldn't
     // poll).
     //
-    // Defensive: Beacon's profile.style_guide should be a markdown string,
-    // but we've seen cached responses where it's missing or wrapped in an
-    // object. If we can't get a usable string, throw a clear error instead
-    // of passing a non-string downstream (where parseDoctrineFromVoiceMd
-    // would explode with "content.match is not a function").
+    // Beacon's response shape varies: sometimes profile.style_guide is the
+    // markdown string we want, sometimes it's missing and we have to
+    // assemble a style guide from profile.formats / profile.stylometry /
+    // other fields. Try the direct field first, then synthesize, then
+    // give up with a clear error.
     if (input.twitterHandle && beacon.beaconConfigured) {
+      const handle = input.twitterHandle.replace(/^@/, '');
       const result = await beacon.analyzeAndAwaitVoice(input.twitterHandle);
-      const styleGuide = result.profile?.style_guide;
-      if (typeof styleGuide !== 'string' || styleGuide.trim().length === 0) {
-        throw new Error(
-          `Beacon returned no usable style_guide for @${input.twitterHandle.replace(/^@/, '')}. ` +
-          `Try a different handle, paste writing samples, or upload voice.md instead.`,
-        );
-      }
-      return styleGuide;
+
+      // Diagnostic log — see exactly what Beacon returned for this handle.
+      // Read in `npm run dev` terminal output when the path fails.
+      console.log('[beacon] voice/analyze result for @' + handle + ':', {
+        status: result.status,
+        hasProfile: !!result.profile,
+        profileKeys: result.profile ? Object.keys(result.profile) : [],
+        styleGuideType: typeof result.profile?.style_guide,
+        styleGuideLen:
+          typeof result.profile?.style_guide === 'string'
+            ? result.profile.style_guide.length
+            : null,
+      });
+
+      const styleGuide = extractStyleGuide(result, handle);
+      if (styleGuide) return styleGuide;
+
+      throw new Error(
+        `Beacon returned no usable voice profile for @${handle}. ` +
+        `Try a different handle, paste writing samples, or upload voice.md instead.`,
+      );
     }
 
     throw new Error('No voice source provided — need voiceMd, samples, or twitterHandle');
