@@ -135,8 +135,8 @@ export function briefPrompt(selectedAngle?: string): string {
 
 > ${selectedAngle}
 
-Develop a brief that COMMITS to this angle as the SINGLE spine of the piece. Resist the temptation to layer in additional arguments — focus is the discipline. Use the gap analysis and trend brief in our conversation history for grounding.`
-    : `Based on the gap analysis just produced, pick the ONE highest-leverage angle and write a tight brief around it. Resist the temptation to combine multiple gaps into one piece — focus is the discipline.`;
+This angle is anchored to ONE specific signal from the trend brief earlier in our conversation. Develop a brief that COMMITS to this angle as the SINGLE spine of the piece. The piece is about ONE thing, anchored on ONE signal. Resist the temptation to layer in additional arguments from elsewhere in the trend brief — focus is the discipline.`
+    : `From the trend brief in our conversation, pick the ONE highest-leverage angle anchored to ONE signal and write a tight brief around it. The piece is about ONE thing. Resist the temptation to combine multiple signals into one piece — focus is the discipline.`;
 
   return `${focusDisciplineHeader}
 

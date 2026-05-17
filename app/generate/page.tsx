@@ -2,8 +2,9 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import type { PipelineEvent, PipelineStep, TrendBrief, AngleProposal, AnglesResponse } from '@/lib/types';
+import type { PipelineEvent, PipelineStep, TrendBrief } from '@/lib/types';
 import { parseTrendBrief } from '@/lib/trendBriefParser';
+import type { SuggestedAngle } from '@/lib/trendBriefParser';
 
 const STEP_LABELS: Record<PipelineStep, string> = {
   voice_extraction: 'Voice extraction',
@@ -148,10 +149,7 @@ function GeneratePageInner() {
   const [trendsLoading, setTrendsLoading] = useState(false);
   const [trendsError, setTrendsError] = useState<string | null>(null);
 
-  // Angle picker state
-  const [anglesData, setAnglesData] = useState<AnglesResponse | null>(null);
-  const [anglesLoading, setAnglesLoading] = useState(false);
-  const [anglesError, setAnglesError] = useState<string | null>(null);
+  // Angle picker state — angles are now per-signal chips on trend cards
   const [selectedAngle, setSelectedAngle] = useState<string>('');
   const [customAngle, setCustomAngle] = useState<string>('');
 
@@ -190,8 +188,6 @@ function GeneratePageInner() {
     setTrendsLoading(true);
     setTrendsError(null);
     // Fresh trends invalidate everything downstream
-    setAnglesData(null);
-    setAnglesError(null);
     setSelectedAngle('');
     setCustomAngle('');
     setDraftRunning(false);
@@ -215,28 +211,6 @@ function GeneratePageInner() {
       setTrendsError(err instanceof Error ? err.message : 'Fetch failed');
     } finally {
       setTrendsLoading(false);
-    }
-  }
-
-  async function proposeAngles(): Promise<void> {
-    if (!founderId || !signalBrief.trim()) return;
-    setAnglesLoading(true);
-    setAnglesError(null);
-    setSelectedAngle('');
-    setCustomAngle('');
-    try {
-      const res = await fetch('/api/angles', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ founderId, signalBrief }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message ?? 'Propose angles failed');
-      setAnglesData(data);
-    } catch (err) {
-      setAnglesError(err instanceof Error ? err.message : 'Propose angles failed');
-    } finally {
-      setAnglesLoading(false);
     }
   }
 
@@ -503,15 +477,13 @@ function GeneratePageInner() {
           </div>
         )}
 
-        {/* ─── Step 1: Trends + Angle (2-column) ─── */}
+        {/* ─── Step 1: Trends + Angle (single column, angles inline on cards) ─── */}
         {activeStep === 'trends_angle' && (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <section>
-              <h2 className="mb-2 text-lg font-semibold">Trends</h2>
+              <h2 className="mb-2 text-lg font-semibold">Trends + Angle</h2>
               <p className="mb-3 text-sm text-neutral-400">
-                Auto-fetched from Reddit, Hacker News, and Polymarket — last 30 days.
-                Edit the brief below before generation if you want to refine the angle.
+                Auto-fetched from Reddit, Hacker News, and Polymarket — last 30 days. Each conversation and whitespace gap comes with tight angle suggestions anchored to that one signal. Click an angle to pick it, or write your own at the bottom.
               </p>
 
               <div className="mb-3 flex gap-2">
@@ -596,7 +568,14 @@ function GeneratePageInner() {
                   )}
                   {/* Structured render of the brief if parsing succeeded */}
                   {parsedBrief ? (
-                    <BriefRenderer parsed={parsedBrief} />
+                    <BriefRenderer
+                      parsed={parsedBrief}
+                      selectedAngle={selectedAngle}
+                      onAngleSelect={(title) => {
+                        setSelectedAngle(title);
+                        setCustomAngle('');
+                      }}
+                    />
                   ) : (
                     <pre className="whitespace-pre-wrap rounded-md border border-neutral-800 bg-neutral-900 p-3 text-xs font-mono text-neutral-300">
                       {signalBrief}
@@ -620,143 +599,47 @@ function GeneratePageInner() {
               )}
             </section>
 
-            {/* Angle picker — between trends and generation */}
-            {trendBrief && signalBrief.trim() && (
-              <section>
-                <div className="mb-3 flex items-center justify-between">
-                  <h2 className="text-lg font-semibold">Angle</h2>
-                  {anglesData && (
-                    <button
-                      type="button"
-                      onClick={proposeAngles}
-                      disabled={anglesLoading}
-                      className="text-xs text-neutral-400 hover:text-neutral-200 disabled:opacity-50"
-                    >
-                      ↻ Re-propose
-                    </button>
+            {/* Step 1 footer — selected angle + custom input + Continue */}
+            <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-4 space-y-3">
+              <div className="flex items-center justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                  {anglePicked ? (
+                    <>
+                      <div className="mb-1 text-xs text-neutral-500">Selected angle</div>
+                      <div className="text-sm text-neutral-100">
+                        {selectedAngle || customAngle}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-sm text-neutral-500">
+                      Click an angle chip above, or write your own below
+                    </div>
                   )}
                 </div>
-
-                {!anglesData && !anglesLoading && (
-                  <div className="rounded-md border border-neutral-800 bg-neutral-900 p-4">
-                    <p className="mb-3 text-sm text-neutral-400">
-                      Hivemind will analyze the brief + your project context and propose
-                      3-5 distinct angles to choose from.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={proposeAngles}
-                      className="rounded-md bg-white px-4 py-2 text-sm font-medium text-black hover:bg-neutral-200"
-                    >
-                      Propose angles
-                    </button>
-                  </div>
-                )}
-
-                {anglesLoading && (
-                  <div className="rounded-md border border-neutral-800 bg-neutral-900 p-6 text-center text-sm text-neutral-400">
-                    Running gap analysis + angle proposals (~20s)…
-                  </div>
-                )}
-
-                {anglesError && (
-                  <div className="rounded-md border border-red-900 bg-red-950/50 px-3 py-2 text-xs text-red-300">
-                    {anglesError}
-                  </div>
-                )}
-
-                {anglesData && (
-                  <>
-                    <div className="mb-3 space-y-2">
-                      {anglesData.proposals.map((p, i) => {
-                        const isSelected = selectedAngle === p.title;
-                        return (
-                          <button
-                            key={i}
-                            type="button"
-                            onClick={() => {
-                              setSelectedAngle(p.title);
-                              setCustomAngle('');
-                            }}
-                            className={`w-full rounded-lg border p-4 text-left transition-colors ${
-                              isSelected
-                                ? 'border-blue-600 bg-blue-950/30'
-                                : 'border-neutral-800 bg-neutral-900 hover:border-neutral-700'
-                            }`}
-                          >
-                            <div className="mb-1.5 flex items-center gap-2">
-                              <span className={`rounded px-1.5 py-0.5 text-[10px] font-mono uppercase ${hookChipClass(p.hook_style)}`}>
-                                {p.hook_style}
-                              </span>
-                              {isSelected && (
-                                <span className="text-[10px] font-mono text-blue-400">SELECTED</span>
-                              )}
-                            </div>
-                            <h3 className="mb-1.5 text-base font-medium text-neutral-100">{p.title}</h3>
-                            <p className="mb-2 text-sm text-neutral-400">{p.summary}</p>
-                            {p.gap_reference && (
-                              <div className="text-xs text-neutral-500">
-                                Addresses: <span className="italic">{p.gap_reference}</span>
-                              </div>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    <div className="mb-3">
-                      <label className="mb-1 block text-xs text-neutral-400">
-                        Or type your own angle:
-                      </label>
-                      <input
-                        type="text"
-                        value={customAngle}
-                        onChange={(e) => {
-                          setCustomAngle(e.target.value);
-                          if (e.target.value.trim()) setSelectedAngle('');
-                        }}
-                        placeholder="Your own angle in one sentence…"
-                        className="w-full rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-200"
-                      />
-                    </div>
-
-                    <details>
-                      <summary className="cursor-pointer text-xs text-neutral-400 hover:text-neutral-200">
-                        Show gap analysis (the reasoning behind these angles)
-                      </summary>
-                      <pre className="mt-2 max-h-72 overflow-y-auto whitespace-pre-wrap rounded-md border border-neutral-800 bg-neutral-950 p-3 text-xs text-neutral-300">
-                        {anglesData.gap_analysis}
-                      </pre>
-                    </details>
-                  </>
-                )}
-              </section>
-            )}
-            </div>
-            {/* Step 1 footer — selected angle + Continue */}
-            <div className="flex items-center justify-between gap-4 rounded-lg border border-neutral-800 bg-neutral-900 p-4">
-              <div className="min-w-0 flex-1">
-                {anglePicked ? (
-                  <>
-                    <div className="mb-1 text-xs text-neutral-500">Selected angle</div>
-                    <div className="truncate text-sm text-neutral-100">
-                      {selectedAngle || customAngle}
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-sm text-neutral-500">
-                    Pick an angle to continue
-                  </div>
-                )}
+                <button
+                  type="button"
+                  onClick={() => setActiveStep('draft')}
+                  disabled={!anglePicked}
+                  className="whitespace-nowrap rounded-md bg-white px-5 py-2.5 text-sm font-medium text-black hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Continue to Draft →
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setActiveStep('draft')}
-                disabled={!anglePicked}
-                className="whitespace-nowrap rounded-md bg-white px-5 py-2.5 text-sm font-medium text-black hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Continue to Draft →
-              </button>
+              <div>
+                <label className="mb-1 block text-xs text-neutral-500">
+                  Or type your own angle (anchored to ONE signal — keep it tight):
+                </label>
+                <input
+                  type="text"
+                  value={customAngle}
+                  onChange={(e) => {
+                    setCustomAngle(e.target.value);
+                    if (e.target.value.trim()) setSelectedAngle('');
+                  }}
+                  placeholder="e.g. Why Altman's UBI walk-back kills the agency labor compact"
+                  className="w-full rounded-md border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200"
+                />
+              </div>
             </div>
           </div>
         )}
@@ -1099,14 +982,22 @@ function BriefSection({
   );
 }
 
-function BriefRenderer({ parsed }: { parsed: NonNullable<ReturnType<typeof parseTrendBrief>> }) {
+function BriefRenderer({
+  parsed,
+  selectedAngle,
+  onAngleSelect,
+}: {
+  parsed: NonNullable<ReturnType<typeof parseTrendBrief>>;
+  selectedAngle: string;
+  onAngleSelect: (title: string) => void;
+}) {
   return (
     <div className="space-y-5">
       {parsed.topConversations.length > 0 && (
         <BriefSection
           title="Top conversations"
           count={parsed.topConversations.length}
-          defaultOpen={false}
+          defaultOpen={true}
         >
           {parsed.topConversations.map((c, i) => (
             <article
@@ -1139,10 +1030,15 @@ function BriefRenderer({ parsed }: { parsed: NonNullable<ReturnType<typeof parse
                 </p>
               )}
               {c.quote && (
-                <blockquote className="border-l-2 border-neutral-700 pl-2 text-xs italic text-neutral-300">
+                <blockquote className="mb-2 border-l-2 border-neutral-700 pl-2 text-xs italic text-neutral-300">
                   “{c.quote}”
                 </blockquote>
               )}
+              <AngleChips
+                angles={c.suggestedAngles}
+                selectedAngle={selectedAngle}
+                onAngleSelect={onAngleSelect}
+              />
             </article>
           ))}
         </BriefSection>
@@ -1152,7 +1048,7 @@ function BriefRenderer({ parsed }: { parsed: NonNullable<ReturnType<typeof parse
         <BriefSection
           title="Patterns observed"
           count={parsed.patterns.length}
-          defaultOpen={true}
+          defaultOpen={false}
         >
           {parsed.patterns.map((p) => (
             <article
@@ -1192,9 +1088,15 @@ function BriefRenderer({ parsed }: { parsed: NonNullable<ReturnType<typeof parse
                 </span>
                 <span>{w.title}</span>
               </h4>
-              <p className="text-xs leading-relaxed text-amber-200/80 whitespace-pre-wrap">
+              <p className="mb-2 text-xs leading-relaxed text-amber-200/80 whitespace-pre-wrap">
                 {w.body}
               </p>
+              <AngleChips
+                angles={w.suggestedAngles}
+                selectedAngle={selectedAngle}
+                onAngleSelect={onAngleSelect}
+                amber
+              />
             </article>
           ))}
         </BriefSection>
@@ -1208,6 +1110,55 @@ function BriefRenderer({ parsed }: { parsed: NonNullable<ReturnType<typeof parse
           <p className="text-red-200/90">{parsed.weakAssumption}</p>
         </div>
       )}
+    </div>
+  );
+}
+
+// Renders 0-2 clickable angle chips below a signal/whitespace card. Each chip
+// shows the hook style + angle title. Clicking selects that angle as the
+// pillar's anchor.
+function AngleChips({
+  angles,
+  selectedAngle,
+  onAngleSelect,
+  amber = false,
+}: {
+  angles?: SuggestedAngle[];
+  selectedAngle: string;
+  onAngleSelect: (title: string) => void;
+  amber?: boolean;
+}) {
+  if (!angles || angles.length === 0) return null;
+  return (
+    <div className={`mt-2 space-y-1.5 border-t ${amber ? 'border-amber-900/30' : 'border-neutral-800'} pt-2`}>
+      <div className={`text-[10px] font-semibold uppercase tracking-wide ${amber ? 'text-amber-500/70' : 'text-neutral-500'}`}>
+        Angle suggestions
+      </div>
+      <div className="space-y-1">
+        {angles.map((a, i) => {
+          const isSelected = selectedAngle === a.title;
+          return (
+            <button
+              key={i}
+              type="button"
+              onClick={() => onAngleSelect(a.title)}
+              className={`flex w-full items-start gap-2 rounded-md border px-2 py-1.5 text-left text-xs transition-colors ${
+                isSelected
+                  ? 'border-blue-600 bg-blue-950/30'
+                  : 'border-neutral-800 bg-neutral-950 hover:border-neutral-700'
+              }`}
+            >
+              <span className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-mono uppercase ${hookChipClass(a.hook_style)}`}>
+                {a.hook_style}
+              </span>
+              <span className="flex-1 text-neutral-200">{a.title}</span>
+              {isSelected && (
+                <span className="shrink-0 text-[9px] font-mono text-blue-400">SELECTED</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

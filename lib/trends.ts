@@ -224,23 +224,32 @@ SOURCES: Reddit, Hacker News, Polymarket
 RAW SIGNALS (sorted by engagement, top ${compact.length}):
 ${JSON.stringify(compact)}
 
-Produce a structured markdown brief in this format:
+Produce a structured markdown brief. For each top conversation AND each whitespace item, propose 1-2 tight angles — each anchored to that ONE signal/item.
 
 ## Top conversations
-Pick the 5-7 highest-signal items across sources. For each:
-- **[title]** — [source, engagement count] — one sentence on why it matters
-- > short quote/snippet (use actual title or excerpt, not paraphrase)
+Pick 5-7 highest-signal items. For each:
+- **[title]** — [source, engagement] — one sentence on why it matters
+  > "short quote"
+  → Angle [hook_style]: A tight 8-12 word headline anchored ONLY to this signal
+  → Angle [hook_style]: A second take on the SAME signal (optional)
 
 ## Patterns observed
-3-4 things that recur across multiple signals. The meta-narrative — what is the conversation actually about, beyond any single post?
+3-4 meta-narratives. CONTEXT ONLY — do not propose angles for patterns.
 
 ## Whitespace
-1-2 angles that are NOT being talked about but should be, given what IS being said. Gaps a founder could occupy.
+1-2 specific gaps. Each:
+**[Specific gap title].** Brief 2-3 sentence body.
+→ Angle [hook_style]: Tight 8-12 word headline anchored to this gap
+
+CRITICAL ANGLE CONSTRAINTS:
+- hook_style: provocative | insight | story | contrarian
+- Each angle anchors to ONE signal/gap — never wrap multiple
+- FORBIDDEN: angles like "three pressures", "structural collapse", manifesto framings
+- Each angle should work as a SINGLE-POST headline
 
 Rules:
-- Cite specific items by index ([1], [2], etc.) when referencing them
-- Skip generic AI commentary ("AI is transforming...")
-- Be specific to what's actually in the signals
+- Cite by index ([1], [2]) when referencing
+- No generic AI commentary
 - No preamble — output the brief directly`;
 
   const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -284,22 +293,35 @@ LOOKBACK: last ${days} days
 RAW SIGNALS (sorted by engagement across Reddit, HN, Polymarket, and Beacon X — top ${compact.length}):
 ${JSON.stringify(compact)}
 
-Produce a structured markdown brief grounded in THIS founder's positioning:
+Produce a structured markdown brief grounded in THIS founder's positioning. Crucially: for each top conversation AND each whitespace item, propose 1-2 tight angles the founder could write — each anchored to that ONE signal/item.
 
 ## Top conversations
-Pick 5-7 highest-signal items RELEVANT to this founder's space. Each:
-- **[title]** — [source, engagement] — one sentence on why it matters to THIS founder specifically (use the project context)
-- > short quote/excerpt from the signal
+Pick 5-7 highest-signal items RELEVANT to this founder's space. For each, use this EXACT format:
+
+- **[title]** — [source, engagement] — one sentence on why it matters to THIS founder
+  > "short quote/excerpt"
+  → Angle [hook_style]: A tight 8-12 word headline anchored ONLY to THIS signal
+  → Angle [hook_style]: A second take on the SAME signal (optional — only if it's a genuinely different angle)
 
 ## Patterns observed
-3-4 meta-narratives across signals, framed against this founder's domain and audiences.
+3-4 meta-narratives across signals, framed against this founder's domain. These are CONTEXT ONLY — do not propose angles for patterns.
 
 ## Whitespace
-1-2 angles NOT being talked about that THIS founder is uniquely positioned to occupy, given their doctrine and positioning.
+1-2 specific narrative gaps. For each, use this format:
+
+**[Specific gap title].** Brief body explaining the gap (2-3 sentences max).
+→ Angle [hook_style]: A tight 8-12 word headline anchored ONLY to this gap
+
+CRITICAL CONSTRAINTS FOR ANGLES:
+- hook_style is one of: provocative | insight | story | contrarian
+- Each angle anchors to ONE signal or ONE whitespace item — NEVER wrap multiple
+- FORBIDDEN: angles that say "three pressures", "five trends", "multiple signals", "structural collapse" — anything implying synthesis across signals
+- FORBIDDEN: manifesto framings like "Why your X is already obsolete" unless anchored to ONE specific event/signal
+- Each angle title should work as a real LinkedIn headline for a SINGLE 500-700 word post
 
 Rules:
-- Use the founder's project context to filter relevance — what would matter to their audiences, not generic "ai marketing" takes
-- Cite signals by index ([1], [2], etc.)
+- Use the founder's project context to filter relevance
+- Cite signals by index ([1], [2], etc.) where natural
 - No generic AI commentary
 - No preamble — output the brief directly`;
 

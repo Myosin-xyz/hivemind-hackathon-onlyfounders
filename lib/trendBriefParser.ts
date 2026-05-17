@@ -8,6 +8,13 @@
 // If everything fails the parser returns null and the caller falls back to
 // rendering the raw markdown.
 
+export type AngleHookStyle = 'provocative' | 'insight' | 'story' | 'contrarian';
+
+export type SuggestedAngle = {
+  hook_style: AngleHookStyle;
+  title: string;             // 8-12 word headline, anchored to ONE signal
+};
+
 export type ConversationItem = {
   title: string;
   source?: string;
@@ -15,12 +22,14 @@ export type ConversationItem = {
   body: string;
   quote?: string;
   citationRef?: number;       // The [N] at the end of the title's body line
+  suggestedAngles?: SuggestedAngle[];  // Per-signal angle suggestions from synth
 };
 
 export type NumberedItem = {
   number: number;
   title: string;             // First sentence / short label
   body: string;              // Rest of the paragraph
+  suggestedAngles?: SuggestedAngle[];  // Per-item angle suggestions (whitespace only)
 };
 
 export type ParsedBrief = {
@@ -182,10 +191,34 @@ function parseTopConversations(text: string): ConversationItem[] {
       }
     }
 
-    items.push({ title, source, engagement, body, quote, citationRef });
+    // Pull per-signal angle suggestions from lines starting with `→ Angle [...]:` or `- Angle [...]:`
+    const suggestedAngles = parseAngleSuggestions(lines);
+
+    items.push({ title, source, engagement, body, quote, citationRef, suggestedAngles });
   }
 
   return items;
+}
+
+// Match lines like:
+//   → Angle [provocative]: Tight headline here
+//   - Angle [insight]: Another tight headline
+//   • Angle [story]: ...
+function parseAngleSuggestions(lines: string[]): SuggestedAngle[] | undefined {
+  const validHooks: AngleHookStyle[] = ['provocative', 'insight', 'story', 'contrarian'];
+  const angleRegex = /^\s*(?:→|->|-|•|\*)?\s*\*?\*?Angle\s*\[(\w+)\]\s*:?\s*\*?\*?\s*(.+?)\s*$/i;
+
+  const angles: SuggestedAngle[] = [];
+  for (const line of lines) {
+    const m = line.match(angleRegex);
+    if (!m) continue;
+    const hookRaw = m[1].toLowerCase() as AngleHookStyle;
+    const hook_style: AngleHookStyle = validHooks.includes(hookRaw) ? hookRaw : 'insight';
+    const title = m[2].replace(/^\*+|\*+$/g, '').replace(/^["“](.+)["”]$/, '$1').trim();
+    if (title.length < 8 || title.length > 200) continue;
+    angles.push({ hook_style, title });
+  }
+  return angles.length > 0 ? angles : undefined;
 }
 
 // Numbered/bold items: try several strategies in order. Whichever yields
@@ -260,10 +293,13 @@ function tryNumberedPatterns(text: string): NumberedItem[] {
     for (const { re, numIdx, titleIdx, bodyIdx } of matchPatterns) {
       const m = block.match(re);
       if (m) {
+        const rawBody = m[bodyIdx].trim();
+        const { cleanedBody, angles } = splitBodyAndAngles(rawBody);
         items.push({
           number: parseInt(m[numIdx], 10),
           title: m[titleIdx].trim().replace(/\.$/, ''),
-          body: m[bodyIdx].trim(),
+          body: cleanedBody,
+          suggestedAngles: angles,
         });
         break;
       }
@@ -271,6 +307,21 @@ function tryNumberedPatterns(text: string): NumberedItem[] {
   }
 
   return items;
+}
+
+// Pull angle suggestion lines out of a body string. Returns the body with
+// angle lines removed, plus the parsed angles.
+function splitBodyAndAngles(body: string): { cleanedBody: string; angles?: SuggestedAngle[] } {
+  const lines = body.split('\n');
+  const angles = parseAngleSuggestions(lines);
+  if (!angles || angles.length === 0) return { cleanedBody: body };
+
+  const angleRegex = /^\s*(?:→|->|-|•|\*)?\s*\*?\*?Angle\s*\[\w+\]/i;
+  const nonAngleLines = lines.filter((l) => !angleRegex.test(l));
+  return {
+    cleanedBody: nonAngleLines.join('\n').trim(),
+    angles,
+  };
 }
 
 // Strategy 2 — bold-headed items (LLM drops the number prefix).
@@ -303,12 +354,14 @@ function tryBoldHeadedPatterns(text: string): NumberedItem[] {
     if (/^\d+\.?\s/.test(h.title)) continue;
 
     const nextStart = i + 1 < headers.length ? headers[i + 1].start : text.length;
-    const body = text.slice(h.end, nextStart).trim();
+    const rawBody = text.slice(h.end, nextStart).trim();
+    const { cleanedBody, angles } = splitBodyAndAngles(rawBody);
 
     items.push({
       number: items.length + 1,
       title: h.title,
-      body,
+      body: cleanedBody,
+      suggestedAngles: angles,
     });
   }
 
