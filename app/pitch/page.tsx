@@ -15,18 +15,18 @@ export default function PitchPage() {
 
       <AmbientGlows />
 
-      <div className="relative z-10 mx-auto flex min-h-[calc(100vh-3px)] max-w-6xl flex-col px-6 py-10">
+      <div className="relative z-10 mx-auto flex min-h-[calc(100vh-3px)] max-w-6xl flex-col px-6 py-14">
         {/* Hero — wordmark already carries the tagline; no second restatement */}
-        <header className="mb-12 text-center">
+        <header className="mb-20 text-center">
           <Wordmark size="lg" showTagline className="leading-none" />
-          <p className="mx-auto mt-8 max-w-xl text-base font-medium text-white/85 md:text-lg">
+          <p className="mx-auto mt-10 max-w-xl text-base font-medium text-white/85 md:text-lg">
             A founder ships voice-locked content weekly. Without ghostwriting it
             themselves.
           </p>
         </header>
 
         {/* Problem / Fix — headline + ONE concrete line each. No paragraphs. */}
-        <section className="mb-10 grid grid-cols-1 gap-4 md:grid-cols-2">
+        <section className="mb-16 grid grid-cols-1 gap-5 md:grid-cols-2">
           <article className="rounded-lg border border-of-orange/25 bg-of-orange/[0.04] p-6">
             <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.16em] text-of-orange">
               The problem
@@ -54,11 +54,11 @@ export default function PitchPage() {
         </section>
 
         {/* Flow — 4 stages, now with concrete details on each */}
-        <section className="mb-10">
-          <p className="mb-4 text-center font-mono text-[10px] uppercase tracking-[0.16em] text-white/40">
+        <section className="mb-16">
+          <p className="mb-6 text-center font-mono text-[10px] uppercase tracking-[0.16em] text-white/40">
             The pipeline · 5 minutes end-to-end
           </p>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
             <StageCard
               num="01"
               color="of-blue"
@@ -87,8 +87,8 @@ export default function PitchPage() {
         </section>
 
         {/* Hivemind callout — depth, but tightened */}
-        <section className="mb-8 rounded-lg border border-white/10 bg-white/[0.02] p-6">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <section className="mb-16 rounded-lg border border-white/10 bg-white/[0.02] p-8">
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-white/45">
               How Hivemind plugs in
             </p>
@@ -118,7 +118,7 @@ export default function PitchPage() {
         </section>
 
         {/* The proof — elevates the blind test from secondary link to a real beat */}
-        <section className="mb-10 flex flex-col items-center gap-2 text-center">
+        <section className="mb-14 flex flex-col items-center gap-3 text-center">
           <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-of-pink">
             ✦ The proof
           </p>
@@ -131,10 +131,10 @@ export default function PitchPage() {
         </section>
 
         {/* Spacer pushes CTAs down */}
-        <div className="flex-1 min-h-2" />
+        <div className="flex-1 min-h-4" />
 
         {/* CTAs */}
-        <div className="mb-10 flex flex-col items-center gap-5 sm:flex-row sm:justify-center sm:gap-8">
+        <div className="mb-12 flex flex-col items-center gap-5 sm:flex-row sm:justify-center sm:gap-8">
           <Link
             href="/app"
             className="group inline-flex items-center gap-3 rounded-full border border-white/25 bg-white/[0.02] px-7 py-3.5 text-sm font-medium uppercase tracking-[0.14em] text-white transition-[background-color,border-color,color] duration-200 hover:border-of-pink hover:bg-of-pink"
