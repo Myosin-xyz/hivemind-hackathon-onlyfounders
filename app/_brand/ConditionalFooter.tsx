@@ -7,9 +7,10 @@ import { HivemindLockup } from './HivemindLockup';
 // but pages that render their own (richer) version suppress this one to avoid
 // double-branding. Currently suppressed:
 //   - /          — cover, renders the hero variant (full-color eye mark)
+//   - /pitch     — demo intro, renders the hero variant
 //   - /generate  — pipeline, renders the brand-spec bottom bar with stats
 //   - /compare   — light surface, renders the pill lockup variant inline
-const SUPPRESS_ON: ReadonlySet<string> = new Set(['/', '/generate', '/compare']);
+const SUPPRESS_ON: ReadonlySet<string> = new Set(['/', '/pitch', '/generate', '/compare']);
 
 export function ConditionalFooter() {
   const pathname = usePathname();
