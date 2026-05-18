@@ -3,6 +3,7 @@
 import { useEffect, useState, use } from 'react';
 import Link from 'next/link';
 import type { FounderProfile } from '@/lib/types';
+import { Wordmark } from '../../_brand/Wordmark';
 
 const NICHE_PRESETS = [
   'ai',
@@ -89,19 +90,26 @@ export default function FounderPage({ params }: { params: Promise<{ id: string }
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-neutral-950 text-neutral-100 p-8">
-        <p className="text-neutral-400">Loading…</p>
+      <main className="min-h-screen bg-of-black p-8 text-white">
+        <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-white/40">
+          Loading…
+        </p>
       </main>
     );
   }
 
   if (!founder || error) {
     return (
-      <main className="min-h-screen bg-neutral-950 text-neutral-100 p-8">
-        <p className="text-red-400">{error ?? 'Founder not found'}</p>
-        <Link href="/app" className="mt-4 inline-block text-blue-400 hover:underline">
-          ← Home
-        </Link>
+      <main className="min-h-screen bg-of-black p-8 text-white">
+        <div className="rounded-lg border border-of-orange/40 bg-of-orange/10 p-6">
+          <p className="text-sm text-of-orange">{error ?? 'Founder not found'}</p>
+          <Link
+            href="/app"
+            className="mt-4 inline-flex font-mono text-[11px] uppercase tracking-[0.14em] text-of-orange/80 hover:text-of-orange"
+          >
+            ← back to founders
+          </Link>
+        </div>
       </main>
     );
   }
@@ -110,38 +118,53 @@ export default function FounderPage({ params }: { params: Promise<{ id: string }
   const hasRecentPosts = (founder.recentPosts ?? []).length > 0;
 
   return (
-    <main className="min-h-screen bg-neutral-950 text-neutral-100">
+    <main className="min-h-screen bg-of-black text-white">
       <div className="mx-auto max-w-3xl px-6 py-12">
-        <Link href="/app" className="text-sm text-neutral-400 hover:text-neutral-200">
-          ← Home
+        <Link
+          href="/app"
+          className="font-mono text-[11px] uppercase tracking-[0.14em] text-white/40 hover:text-white/70 transition-colors"
+        >
+          ← back to founders
         </Link>
 
-        <header className="mt-3 mb-8 flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold">{founder.name}</h1>
-            <p className="mt-1 text-sm text-neutral-500">
+        <header className="mt-3 mb-10 flex items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">
+              Founder
+            </p>
+            <h1 className="mt-1 font-display text-4xl font-bold tracking-tight md:text-5xl">
+              {founder.name}
+            </h1>
+            <p className="mt-2 text-sm text-white/45">
               <a
                 href={founder.websiteUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="hover:text-neutral-300"
+                className="hover:text-white/80 transition-colors"
               >
                 {founder.websiteUrl}
               </a>
             </p>
           </div>
-          <Link
-            href={`/generate?founderId=${founder.id}`}
-            className={`rounded-md px-5 py-2.5 text-sm font-medium ${
-              hasGenerationPrereqs
-                ? 'bg-white text-black hover:bg-neutral-200'
-                : 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
-            }`}
-            aria-disabled={!hasGenerationPrereqs}
-          >
-            Generate content →
-          </Link>
+          {hasGenerationPrereqs ? (
+            <Link
+              href={`/generate?founderId=${founder.id}`}
+              className="group inline-flex shrink-0 items-center gap-2 rounded-full border border-of-blue/50 bg-of-blue/[0.08] px-5 py-2.5 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-of-blue transition-[background-color,border-color,color] hover:border-of-pink hover:bg-of-pink hover:text-white"
+            >
+              Run the pipeline
+              <span aria-hidden className="transition-transform group-hover:translate-x-0.5">→</span>
+            </Link>
+          ) : (
+            <span
+              className="shrink-0 cursor-not-allowed rounded-full border border-white/10 bg-white/[0.02] px-5 py-2.5 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-white/25"
+              title="Onboarding incomplete — voice profile, project, or conversation missing"
+            >
+              Pipeline locked
+            </span>
+          )}
         </header>
+
+        <Wordmark size="sm" showTagline={false} className="hidden md:absolute md:right-6 md:top-6" />
 
         {/* What Hivemind figured out */}
         {founder.enriched && (
@@ -152,21 +175,29 @@ export default function FounderPage({ params }: { params: Promise<{ id: string }
               )}
               {founder.enriched.audiences?.length ? (
                 <DLRow label="Audiences">
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-1.5">
                     {founder.enriched.audiences.map((a, i) => (
                       <span
                         key={i}
-                        className="rounded bg-neutral-800 px-2 py-0.5 text-xs text-neutral-300"
+                        className="inline-flex items-center gap-1.5 rounded-full border border-of-blue/30 bg-of-blue/[0.06] px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-of-blue"
                       >
+                        <span className="block h-1 w-1 rounded-full bg-of-blue" />
                         {a}
                       </span>
                     ))}
                   </div>
                 </DLRow>
               ) : null}
-              {founder.enriched.stage && <DLRow label="Stage">{founder.enriched.stage}</DLRow>}
+              {founder.enriched.stage && (
+                <DLRow label="Stage">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-of-green/30 bg-of-green/[0.06] px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-of-green">
+                    <span className="block h-1 w-1 rounded-full bg-of-green" />
+                    {founder.enriched.stage}
+                  </span>
+                </DLRow>
+              )}
               <DLRow label="Project ID">
-                <code className="text-xs text-neutral-400">{founder.hivemindProjectId}</code>
+                <code className="font-mono text-[11px] text-white/45">{founder.hivemindProjectId}</code>
               </DLRow>
             </dl>
           </Section>
@@ -174,28 +205,31 @@ export default function FounderPage({ params }: { params: Promise<{ id: string }
 
         {/* Voice profile */}
         <Section title="Voice profile">
-          <button
-            onClick={() => setShowStyleGuide(!showStyleGuide)}
-            className="text-sm text-neutral-400 hover:text-neutral-200"
-          >
-            {showStyleGuide ? '▼ Hide' : '▶ Show'} style guide
-          </button>
-          {showStyleGuide && founder.styleGuide && (
-            <pre className="mt-3 max-h-96 overflow-y-auto rounded-md bg-neutral-950 border border-neutral-800 p-4 text-xs font-mono text-neutral-300 whitespace-pre-wrap">
-              {founder.styleGuide}
-            </pre>
-          )}
-          {!founder.styleGuide && (
-            <p className="text-sm text-neutral-500">No style guide yet.</p>
+          {founder.styleGuide ? (
+            <>
+              <button
+                onClick={() => setShowStyleGuide(!showStyleGuide)}
+                className="font-mono text-[11px] uppercase tracking-[0.12em] text-white/55 hover:text-white transition-colors"
+              >
+                {showStyleGuide ? '▼ Hide' : '▶ Show'} style guide ({Math.round(founder.styleGuide.length / 100) / 10}k chars)
+              </button>
+              {showStyleGuide && (
+                <pre className="mt-4 max-h-96 overflow-y-auto rounded-md border border-white/8 bg-of-black p-4 text-xs font-mono leading-relaxed text-white/80 whitespace-pre-wrap">
+                  {founder.styleGuide}
+                </pre>
+              )}
+            </>
+          ) : (
+            <p className="text-sm text-white/45">No style guide yet.</p>
           )}
         </Section>
 
         {/* Optional polish */}
-        <h2 className="mt-10 mb-2 text-lg font-semibold text-neutral-300">
+        <h2 className="mt-12 mb-2 font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-white/55">
           Optional polish
         </h2>
-        <p className="mb-6 text-sm text-neutral-500">
-          Improves gap analysis and content grounding. Pipeline runs without these — better with them.
+        <p className="mb-6 text-sm text-white/45">
+          Improves gap analysis and content grounding. Pipeline runs without these. Sharper with them.
         </p>
 
         {/* Doctrine */}
@@ -210,7 +244,7 @@ export default function FounderPage({ params }: { params: Promise<{ id: string }
               type="button"
               onClick={extractDoctrineFromContext}
               disabled={extractingDoctrine}
-              className="rounded-md border border-neutral-700 px-4 py-1.5 text-xs hover:bg-neutral-800 disabled:opacity-50"
+              className="rounded-full border border-of-blue/40 bg-of-blue/[0.06] px-4 py-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-of-blue transition-colors hover:border-of-blue hover:bg-of-blue/15 disabled:opacity-50"
               title="Use Hivemind to extract doctrine from your project context"
             >
               {extractingDoctrine ? 'Extracting…' : '✨ Extract from project'}
@@ -221,7 +255,7 @@ export default function FounderPage({ params }: { params: Promise<{ id: string }
             value={doctrine}
             onChange={(e) => setDoctrine(e.target.value)}
             rows={6}
-            className="w-full rounded-md border border-neutral-800 bg-neutral-900 p-3 text-sm text-neutral-100"
+            className="w-full rounded-md border border-white/12 bg-white/[0.03] p-3 text-sm leading-relaxed text-white placeholder:text-white/25"
             placeholder="What you fundamentally believe about your domain. The principles you'd defend."
           />
         </EditableSection>
@@ -246,8 +280,8 @@ export default function FounderPage({ params }: { params: Promise<{ id: string }
             value={recentPostsText}
             onChange={(e) => setRecentPostsText(e.target.value)}
             rows={10}
-            className="w-full rounded-md border border-neutral-800 bg-neutral-900 p-3 text-sm font-mono text-neutral-200"
-            placeholder="Post 1...&#10;---&#10;Post 2..."
+            className="w-full rounded-md border border-white/12 bg-white/[0.03] p-3 text-sm font-mono text-white placeholder:text-white/25"
+            placeholder={'Post 1...\n---\nPost 2...'}
           />
         </EditableSection>
 
@@ -268,10 +302,10 @@ export default function FounderPage({ params }: { params: Promise<{ id: string }
             <select
               value={niche}
               onChange={(e) => setNiche(e.target.value)}
-              className="w-full rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100"
+              className="w-full rounded-md border border-white/12 bg-white/[0.03] px-3 py-2.5 text-sm text-white"
             >
               {NICHE_PRESETS.map((n) => (
-                <option key={n} value={n}>
+                <option key={n} value={n} className="bg-of-black">
                   {n}
                 </option>
               ))}
@@ -281,7 +315,7 @@ export default function FounderPage({ params }: { params: Promise<{ id: string }
               value={keywords}
               onChange={(e) => setKeywords(e.target.value)}
               placeholder="ai agents, llm tools, agent workflows"
-              className="w-full rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100"
+              className="w-full rounded-md border border-white/12 bg-white/[0.03] px-3 py-2.5 text-sm text-white placeholder:text-white/25"
             />
           </div>
         </EditableSection>
@@ -292,8 +326,10 @@ export default function FounderPage({ params }: { params: Promise<{ id: string }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="mb-8 rounded-lg border border-neutral-800 bg-neutral-900 p-5">
-      <h2 className="mb-4 text-lg font-semibold">{title}</h2>
+    <section className="mb-6 rounded-lg border border-white/8 bg-white/[0.02] p-6">
+      <h2 className="mb-4 font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-white/55">
+        {title}
+      </h2>
       {children}
     </section>
   );
@@ -302,8 +338,10 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function DLRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="grid grid-cols-[140px_1fr] gap-3 items-start">
-      <dt className="text-neutral-500">{label}</dt>
-      <dd className="text-neutral-200">{children}</dd>
+      <dt className="font-mono text-[10px] uppercase tracking-[0.12em] text-white/35">
+        {label}
+      </dt>
+      <dd className="text-white/85">{children}</dd>
     </div>
   );
 }
@@ -333,35 +371,39 @@ function EditableSection({
     <section
       className={`mb-3 rounded-lg border transition-colors ${
         empty && emptyHighlight
-          ? 'border-amber-900/50 bg-amber-950/10'
-          : 'border-neutral-800 bg-neutral-900'
+          ? 'border-of-orange/30 bg-of-orange/[0.04]'
+          : 'border-white/8 bg-white/[0.02]'
       }`}
     >
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className={`w-full flex items-center justify-between gap-3 p-5 text-left hover:bg-neutral-800/30 ${
+        className={`w-full flex items-center justify-between gap-3 p-5 text-left transition-colors hover:bg-white/[0.02] ${
           open ? 'rounded-t-lg' : 'rounded-lg'
         }`}
       >
         <div className="min-w-0">
-          <h3 className="text-base font-semibold flex items-baseline gap-2">
+          <h3 className="flex items-baseline gap-2 text-base font-semibold text-white">
             <span>{title}</span>
             {empty && (
               <span
-                className={`text-xs font-normal ${
-                  emptyHighlight ? 'text-amber-400' : 'text-neutral-500'
+                className={`font-mono text-[10px] font-normal uppercase tracking-[0.12em] ${
+                  emptyHighlight ? 'text-of-orange' : 'text-white/40'
                 }`}
               >
                 · {emptyHighlight ? 'recommended' : 'empty'}
               </span>
             )}
-            {!empty && <span className="text-xs font-normal text-green-500">· set</span>}
+            {!empty && (
+              <span className="font-mono text-[10px] font-normal uppercase tracking-[0.12em] text-of-green">
+                · set
+              </span>
+            )}
           </h3>
-          <p className="mt-0.5 text-xs text-neutral-500">{hint}</p>
+          <p className="mt-0.5 text-xs text-white/45">{hint}</p>
         </div>
         <span
-          className={`shrink-0 text-neutral-500 transition-transform duration-150 ${
+          className={`shrink-0 text-white/40 transition-transform duration-150 ${
             open ? 'rotate-90' : ''
           }`}
         >
@@ -377,9 +419,12 @@ function EditableSection({
             <button
               onClick={onSave}
               disabled={saving}
-              className="rounded-md bg-white px-4 py-1.5 text-xs font-medium text-black hover:bg-neutral-200 disabled:opacity-50"
+              className="group inline-flex items-center gap-1.5 rounded-full border border-of-blue/50 bg-of-blue/[0.08] px-5 py-1.5 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-of-blue transition-[background-color,border-color,color] hover:border-of-pink hover:bg-of-pink hover:text-white disabled:opacity-50"
             >
               {saving ? 'Saving…' : 'Save'}
+              {!saving && (
+                <span aria-hidden className="transition-transform group-hover:translate-x-0.5">→</span>
+              )}
             </button>
           </div>
         </div>
