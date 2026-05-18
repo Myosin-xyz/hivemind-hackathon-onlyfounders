@@ -192,13 +192,33 @@ async function fetchPolymarket(topic: string): Promise<RawSignal[]> {
 async function fetchBeaconX(niche: string): Promise<RawSignal[]> {
   if (!beacon.beaconConfigured) return [];
   try {
-    const { posts } = await beacon.getSignalFeed(niche, {
+    // Removed the minVirality threshold — was filtering posts that may
+    // have legitimate signal. Better to take whatever Beacon has for the
+    // niche and let downstream ranking sort it out.
+    const response = await beacon.getSignalFeed(niche, {
       source: 'twitter',
       limit: 30,
       sort: 'virality',
-      minVirality: 0.1,
     });
-    return posts.map(beacon.beaconSignalToRaw);
+
+    // Diagnostic — Beacon's signal feed is niche-scoped to what's been
+    // collected via /voice/patterns/collect. If the niche has never been
+    // collected, the feed is empty regardless of how popular the topic
+    // is on X. Surface the raw shape so we can tell empty-feed from
+    // wrong-niche-name from filter-too-tight.
+    console.log('[trends] Beacon signal feed for niche="' + niche + '":', {
+      posts_returned: response.posts.length,
+      total: response.total,
+      last_collected: response.last_collected,
+      first_post_preview: response.posts[0]
+        ? {
+            virality: response.posts[0].virality_score,
+            text: response.posts[0].text?.slice(0, 80),
+          }
+        : null,
+    });
+
+    return response.posts.map(beacon.beaconSignalToRaw);
   } catch (err) {
     console.warn('[trends] Beacon signal feed failed:', err);
     return [];
