@@ -23,7 +23,7 @@ const dmMono = DM_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Only Founders: founder-led content that sounds like the founder",
+  title: "OnlyFounders · voice-locked founder content",
   description:
     "Hivemind-grounded pipeline. One founder, one signal, one angle, one pillar plus four channel variations. Voice-locked, not generic.",
 };
