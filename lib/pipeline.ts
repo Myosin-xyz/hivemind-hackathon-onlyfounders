@@ -19,16 +19,29 @@ export type PipelineCallbacks = {
 };
 
 // Try to pull a usable style guide string directly out of Beacon's response.
-// Order of preference:
-//   1. profile.style_guide (the documented happy path)
-//   2. any top-level string field on result that looks like a style guide
-// Returns null when Beacon didn't surface a usable string — the caller
-// then asks Hivemind ghostwriter to interpret the raw profile data
-// instead, which produces a real voice.md rather than a stat dump.
+// Beacon may surface style_guide as:
+//   (a) a markdown string under profile.style_guide
+//   (b) an object under profile.style_guide with the markdown nested under
+//       a sub-key (.text / .markdown / .body / .content / .md / .voice_md)
+//   (c) a top-level string under one of the *_guide / *_md aliases
+// Returns null when none of the above turns up a usable string — the
+// caller then asks Hivemind ghostwriter to interpret the raw profile.
 function extractStyleGuideDirect(result: beacon.VoiceAnalyzeStatus): string | null {
-  if (typeof result.profile?.style_guide === 'string' && result.profile.style_guide.trim().length > 50) {
-    return result.profile.style_guide;
+  const sg = (result.profile as Record<string, unknown> | undefined)?.style_guide;
+
+  // (a) string at profile.style_guide
+  if (typeof sg === 'string' && sg.trim().length > 50) return sg;
+
+  // (b) object at profile.style_guide — look for nested markdown
+  if (sg && typeof sg === 'object') {
+    const obj = sg as Record<string, unknown>;
+    for (const key of ['text', 'markdown', 'body', 'content', 'md', 'voice_md']) {
+      const v = obj[key];
+      if (typeof v === 'string' && v.trim().length > 50) return v;
+    }
   }
+
+  // (c) top-level string aliases on the result itself
   const raw = result as unknown as Record<string, unknown>;
   for (const key of ['style_guide', 'styleGuide', 'voice_md', 'voiceMd', 'voice_profile']) {
     const v = raw[key];
@@ -36,6 +49,7 @@ function extractStyleGuideDirect(result: beacon.VoiceAnalyzeStatus): string | nu
   }
   return null;
 }
+
 
 async function emit(
   callbacks: PipelineCallbacks | undefined,
@@ -132,36 +146,50 @@ export async function runOnboarding(
       const result = await beacon.analyzeAndAwaitVoice(input.twitterHandle);
 
       // Diagnostic log — see exactly what Beacon returned for this handle.
+      const profile = result.profile as Record<string, unknown> | undefined;
+      const sgRaw = profile?.style_guide;
       console.log('[beacon] voice/analyze result for @' + handle + ':', {
         status: result.status,
-        hasProfile: !!result.profile,
-        profileKeys: result.profile ? Object.keys(result.profile) : [],
-        styleGuideType: typeof result.profile?.style_guide,
-        styleGuideLen:
-          typeof result.profile?.style_guide === 'string'
-            ? result.profile.style_guide.length
+        hasProfile: !!profile,
+        profileKeys: profile ? Object.keys(profile) : [],
+        styleGuideType: typeof sgRaw,
+        styleGuideLen: typeof sgRaw === 'string' ? sgRaw.length : null,
+        styleGuideObjectKeys:
+          sgRaw && typeof sgRaw === 'object' && !Array.isArray(sgRaw)
+            ? Object.keys(sgRaw as Record<string, unknown>)
             : null,
       });
 
-      // 1. Direct string from Beacon if available
+      // 1. Direct string from Beacon if available (handles string + nested-
+      //    string-in-object + top-level aliases — see extractStyleGuideDirect)
       const direct = extractStyleGuideDirect(result);
       if (direct) return direct;
 
-      // 2. Hivemind interpretation of Beacon's raw stylometry / formats.
-      //    Beacon often returns quantitative data (emoji counts, ngram rates,
-      //    openers/closers, sentence-length percentiles) without a finished
-      //    style_guide string. Send that data to ghostwriter to write a real
-      //    voice.md from the numbers instead of dumping the raw stats.
-      const profile = result.profile;
-      const hasUsableProfileData =
-        !!profile &&
-        ((profile.formats && profile.formats.length > 0) ||
-          (profile.stylometry && Object.keys(profile.stylometry).length > 0));
+      // 2. Hivemind interpretation. Two sources, both common:
+      //    (a) profile.style_guide is a structured OBJECT (no direct nested
+      //        markdown string) — convert to text + interpret
+      //    (b) profile has stylometry / formats but no style_guide at all —
+      //        interpret the raw quantitative data
+      let interpretationSource: unknown = null;
+      if (sgRaw && typeof sgRaw === 'object' && !Array.isArray(sgRaw)) {
+        // Object style_guide: send the whole object (with surrounding context)
+        interpretationSource = {
+          style_guide: sgRaw,
+          formats: (profile as Record<string, unknown>)?.formats,
+          stylometry: (profile as Record<string, unknown>)?.stylometry,
+        };
+      } else if (
+        profile &&
+        (((profile.formats as unknown[])?.length ?? 0) > 0 ||
+          (profile.stylometry && Object.keys(profile.stylometry as Record<string, unknown>).length > 0))
+      ) {
+        interpretationSource = profile;
+      }
 
-      if (hasUsableProfileData) {
+      if (interpretationSource) {
         const conversation = await hivemind.startConversation(
           projectId,
-          prompts.voiceFromBeaconProfilePrompt(handle, profile),
+          prompts.voiceFromBeaconProfilePrompt(handle, interpretationSource),
           'ghostwriter',
         );
         if (typeof conversation.response === 'string' && conversation.response.trim().length > 100) {
