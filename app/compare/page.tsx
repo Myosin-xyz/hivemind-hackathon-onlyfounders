@@ -66,6 +66,10 @@ export default function ComparePage() {
     }
   }
 
+  // Load a demo case and IMMEDIATELY enter the blind test. The textareas
+  // never appear, so a screen-share doesn't leak content to the room before
+  // the reveal. Operates on the fetched data directly (not state) since
+  // setState batches asynchronously within the same handler.
   async function loadDemo(caseId: string) {
     setLoadingDemoId(caseId);
     try {
@@ -75,35 +79,54 @@ export default function ComparePage() {
         return;
       }
       const data = await res.json();
-      setTopic(data.topic ?? '');
-      setOnlyFounders(data.onlyFounders ?? '');
-      setFounderName(data.founderName ?? DEMO_CASES.find((c) => c.id === caseId)?.name ?? '');
-      if (data.genericClaude && String(data.genericClaude).trim()) {
-        setGenericClaude(data.genericClaude);
-      } else if (data.topic) {
-        await generateBaseline(data.topic);
+      const t = data.topic ?? '';
+      const of = String(data.onlyFounders ?? '').trim();
+      const fn = data.founderName ?? DEMO_CASES.find((c) => c.id === caseId)?.name ?? '';
+
+      // Guard: if the founder's content is still the placeholder marker,
+      // don't proceed — would render "[REPLACE BEFORE DEMO]" in the blind
+      // test, which is worse than just refusing.
+      if (!of || of.startsWith('[REPLACE BEFORE DEMO]')) {
+        alert(`No content yet for ${fn}. Generate the pillar via /generate and paste it into public/demo-cases/${caseId}.json before running the blind test.`);
+        return;
       }
+
+      // Generic AI baseline: use baked-in if present, otherwise live-call.
+      let generic = String(data.genericClaude ?? '').trim();
+      if (!generic && t) {
+        generic = (await generateBaseline(t)) ?? '';
+      }
+      if (!generic) {
+        alert('Could not get generic AI baseline. Set ANTHROPIC_API_KEY or check Hivemind.');
+        return;
+      }
+
+      // Update state for the BlindTestView (topic + founderName labels).
+      setTopic(t);
+      setOnlyFounders(of);
+      setFounderName(fn);
+      setGenericClaude(generic);
+
+      // Immediately enter blind test using the fresh data, not state.
+      enterBlindTest(generic, of);
     } finally {
       setLoadingDemoId(null);
     }
   }
 
-  function loadBlindTest() {
-    if (!genericClaude.trim() || !onlyFounders.trim()) {
-      alert('Need both inputs');
-      return;
-    }
+  function enterBlindTest(generic: string, of: string) {
     const shuffled = shuffle([
-      { label: '', content: genericClaude, revealedAs: 'A' as const },
-      { label: '', content: onlyFounders, revealedAs: 'B' as const },
+      { label: '', content: generic, revealedAs: 'A' as const },
+      { label: '', content: of, revealedAs: 'B' as const },
     ]);
-    setColumns(
-      shuffled.map((col, i) => ({
-        ...col,
-        label: ['01', '02'][i],
-      })),
-    );
+    setColumns(shuffled.map((col, i) => ({ ...col, label: ['01', '02'][i] })));
     setRevealed(false);
+  }
+
+  function reshuffleCurrent() {
+    if (genericClaude.trim() && onlyFounders.trim()) {
+      enterBlindTest(genericClaude, onlyFounders);
+    }
   }
 
   return (
@@ -134,18 +157,10 @@ export default function ComparePage() {
         </header>
 
         {columns.length === 0 ? (
-          <SetupPanel
-            topic={topic}
-            setTopic={setTopic}
-            genericClaude={genericClaude}
-            setGenericClaude={setGenericClaude}
-            onlyFounders={onlyFounders}
-            setOnlyFounders={setOnlyFounders}
-            onGenerateBaseline={() => generateBaseline()}
-            onLoadBlindTest={loadBlindTest}
+          <VoicePicker
             onLoadDemo={loadDemo}
-            running={running}
             loadingDemoId={loadingDemoId}
+            running={running}
           />
         ) : (
           <BlindTestView
@@ -158,7 +173,7 @@ export default function ComparePage() {
               setColumns([]);
               setRevealed(false);
             }}
-            onReshuffle={loadBlindTest}
+            onReshuffle={reshuffleCurrent}
           />
         )}
 
@@ -174,138 +189,66 @@ export default function ComparePage() {
   );
 }
 
-function SetupPanel(props: {
-  topic: string;
-  setTopic: (s: string) => void;
-  genericClaude: string;
-  setGenericClaude: (s: string) => void;
-  onlyFounders: string;
-  setOnlyFounders: (s: string) => void;
-  onGenerateBaseline: () => void;
-  onLoadBlindTest: () => void;
+function VoicePicker(props: {
   onLoadDemo: (caseId: string) => void;
-  running: boolean;
   loadingDemoId: string | null;
+  running: boolean;
 }) {
-  const ready = props.genericClaude.trim() && props.onlyFounders.trim();
+  const loadingLabel = props.loadingDemoId
+    ? `Loading ${DEMO_CASES.find((c) => c.id === props.loadingDemoId)?.name ?? props.loadingDemoId}…`
+    : props.running
+    ? 'Generating baseline…'
+    : null;
 
   return (
-    <div className="space-y-6">
-      {/* Demo loader strip — pick which founder's case to load for this round */}
-      <div className="flex flex-col gap-3 rounded-lg border border-of-blue/20 bg-of-blue/[0.04] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <span className="block h-1.5 w-1.5 rounded-full bg-of-blue" />
-          <div className="text-sm text-of-black/75">
-            <span className="font-medium text-of-blue">Demo prep.</span> Load a
-            pre-filled case to skip the paste step.
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {DEMO_CASES.map((c) => {
-            const isLoading = props.loadingDemoId === c.id;
-            const isDisabled = props.loadingDemoId !== null;
-            return (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => props.onLoadDemo(c.id)}
-                disabled={isDisabled}
-                className="group inline-flex items-center gap-1.5 rounded-full border border-of-blue/50 bg-of-blue/[0.08] px-4 py-1.5 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-of-blue transition-[background-color,border-color,color] hover:border-of-pink hover:bg-of-pink hover:text-white disabled:opacity-40"
-              >
-                {isLoading ? 'Loading…' : c.name}
-                {!isLoading && (
-                  <span aria-hidden className="transition-transform group-hover:translate-x-0.5">→</span>
-                )}
-              </button>
-            );
-          })}
-        </div>
+    <div className="mx-auto max-w-3xl">
+      {/* The instruction beat — center stage, no textareas */}
+      <div className="mb-10 text-center">
+        <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.18em] text-of-black/45">
+          ✦ Pick a voice
+        </p>
+        <p className="font-display text-2xl font-bold tracking-tight text-of-black md:text-3xl">
+          Choose a founder. We&apos;ll shuffle their pillar with generic AI on
+          the same topic. The room votes.
+        </p>
       </div>
 
-      {/* Three inputs as a vertical stack with paired column-letter badges */}
-      <section className="rounded-lg border border-of-black/8 bg-white p-6 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-        <SectionHeader badge="00" badgeColor="black" label="Topic" />
-        <p className="mb-4 text-sm text-of-black/55">
-          The topic both pieces are about. Same prompt, same constraint, two
-          different writers.
-        </p>
-        <input
-          type="text"
-          value={props.topic}
-          onChange={(e) => props.setTopic(e.target.value)}
-          placeholder="e.g., why agentic workflows beat single LLM prompts"
-          className="w-full rounded-md border border-of-black/12 bg-white px-3 py-2.5 text-sm text-of-black placeholder:text-of-black/30"
-        />
-      </section>
+      {/* Voice buttons — single click loads + auto-enters the blind test */}
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        {DEMO_CASES.map((c) => {
+          const isLoading = props.loadingDemoId === c.id;
+          const isDisabled = props.loadingDemoId !== null;
+          return (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => props.onLoadDemo(c.id)}
+              disabled={isDisabled}
+              className="group inline-flex items-center gap-2 rounded-full border border-of-black/15 bg-white px-6 py-3 text-base font-medium text-of-black shadow-[0_1px_3px_rgba(0,0,0,0.04)] transition-[background-color,border-color,color,box-shadow] hover:border-of-blue/50 hover:bg-of-blue/[0.06] hover:text-of-blue disabled:opacity-40"
+            >
+              {isLoading ? 'Loading…' : c.name}
+              {!isLoading && (
+                <span aria-hidden className="text-of-black/40 transition-[transform,color] group-hover:translate-x-0.5 group-hover:text-of-blue">→</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
 
-      <section className="rounded-lg border border-of-black/8 bg-white p-6 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <SectionHeader badge="A" badgeColor="neutral" label="Generic AI baseline" />
-          <button
-            onClick={props.onGenerateBaseline}
-            disabled={!props.topic.trim() || props.running}
-            className="rounded-full border border-of-black/20 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-of-black/60 transition-colors hover:border-of-black/40 hover:text-of-black disabled:opacity-40"
-          >
-            {props.running ? 'Generating…' : '↻ Generate'}
-          </button>
+      {/* Loading status under the buttons (live baseline / fetch) */}
+      {loadingLabel && (
+        <div className="mt-8 flex items-center justify-center gap-2 font-mono text-[11px] uppercase tracking-[0.14em] text-of-blue">
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-of-blue opacity-60" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-of-blue" />
+          </span>
+          {loadingLabel}
         </div>
-        <textarea
-          value={props.genericClaude}
-          onChange={(e) => props.setGenericClaude(e.target.value)}
-          placeholder="Click 'Generate' above, or paste a generic AI output here…"
-          rows={8}
-          className="w-full rounded-md border border-of-black/12 bg-white p-3 text-sm leading-relaxed text-of-black placeholder:text-of-black/30"
-        />
-      </section>
+      )}
 
-      <section className="rounded-lg border border-of-blue/15 bg-white p-6 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-        <SectionHeader badge="B" badgeColor="blue" label="Only Founders output" />
-        <textarea
-          value={props.onlyFounders}
-          onChange={(e) => props.setOnlyFounders(e.target.value)}
-          placeholder="Paste the revised pillar from the pipeline…"
-          rows={8}
-          className="w-full rounded-md border border-of-black/12 bg-white p-3 text-sm leading-relaxed text-of-black placeholder:text-of-black/30"
-        />
-      </section>
-
-      <button
-        onClick={props.onLoadBlindTest}
-        disabled={!ready}
-        className="group flex w-full items-center justify-center gap-3 rounded-full border border-of-black/80 bg-of-black px-6 py-4 font-mono text-xs font-medium uppercase tracking-[0.14em] text-white transition-[background-color,border-color] hover:border-of-pink hover:bg-of-pink disabled:cursor-not-allowed disabled:border-of-black/15 disabled:bg-of-black/[0.04] disabled:text-of-black/30"
-      >
-        Shuffle and reveal the room
-        <span aria-hidden className="transition-transform group-hover:translate-x-1">→</span>
-      </button>
-    </div>
-  );
-}
-
-function SectionHeader({
-  badge,
-  badgeColor,
-  label,
-}: {
-  badge: string;
-  badgeColor: 'black' | 'neutral' | 'blue';
-  label: string;
-}) {
-  const colors =
-    badgeColor === 'black'
-      ? 'bg-of-black text-white'
-      : badgeColor === 'blue'
-      ? 'bg-of-blue text-white'
-      : 'bg-of-black/10 text-of-black/70';
-  return (
-    <div className="mb-2 flex items-center gap-2.5">
-      <span
-        className={`inline-flex h-6 min-w-6 items-center justify-center rounded-full px-2 font-mono text-[10px] font-medium uppercase tracking-[0.1em] ${colors}`}
-      >
-        {badge}
-      </span>
-      <h2 className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-of-black/65">
-        {label}
-      </h2>
+      <p className="mt-12 text-center font-mono text-[10px] uppercase tracking-[0.14em] text-of-black/35">
+        Click → blind test loads side-by-side. Click Reveal when ready.
+      </p>
     </div>
   );
 }
@@ -344,7 +287,7 @@ function BlindTestView(props: {
             onClick={props.onReset}
             className="rounded-full border border-of-black/15 px-3.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-of-black/55 transition-colors hover:border-of-black/35 hover:text-of-black"
           >
-            ← Edit inputs
+            ← Pick again
           </button>
         </div>
       </div>
