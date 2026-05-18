@@ -595,7 +595,9 @@ function GeneratePageInner() {
                 </div>
               )}
 
-              {/* Empty state — no scan yet, no cache hit. Big call to action. */}
+              {/* Empty state — no scan yet, no cache hit. Single CTA, no
+                  competing chrome below. The custom-angle escape valve only
+                  appears once trendBrief loads (or an angle is picked). */}
               {!trendBrief && !trendsLoading && !trendsError && (
                 <div className="rounded-lg border border-dashed border-white/12 bg-white/[0.02] p-10 text-center">
                   <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">
@@ -606,9 +608,6 @@ function GeneratePageInner() {
                     to pull the last 30 days from Reddit, Hacker News, and Polymarket,
                     grounded in {founder?.name ?? 'this founder'}&apos;s project context.
                     Takes 20-40s.
-                  </p>
-                  <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.14em] text-white/30">
-                    Or skip ahead and type a custom angle below
                   </p>
                 </div>
               )}
@@ -709,15 +708,13 @@ function GeneratePageInner() {
               )}
             </section>
 
-            {/* Step 1 footer — adapts to state:
-                - empty (no trendBrief, no anglePicked): just the custom-angle
-                  input on its own. No redundant "scan above" line, no
-                  disabled Continue button cluttering the empty state.
-                - trendBrief loaded OR angle picked: full footer with angle
-                  preview / scan-prompt + Continue to Draft button.
-                Custom-angle input is always visible — it's the escape valve. */}
-            <div className="rounded-lg border border-white/8 bg-white/[0.02] p-4 space-y-3">
-              {(trendBrief || anglePicked) && (
+            {/* Step 1 footer — only shown once trendBrief is loaded OR an
+                angle is picked. In empty state, the Step 1 explainer card
+                above is the only block. Custom-angle escape valve appears
+                here after scan; it's not reachable pre-scan, but that's the
+                trade for a clean empty state. */}
+            {(trendBrief || anglePicked) && (
+              <div className="rounded-lg border border-white/8 bg-white/[0.02] p-4 space-y-3">
                 <div className="flex items-center justify-between gap-4">
                   <div className="min-w-0 flex-1">
                     {anglePicked ? (
@@ -745,25 +742,23 @@ function GeneratePageInner() {
                     <span aria-hidden className="transition-transform group-hover:translate-x-0.5">→</span>
                   </button>
                 </div>
-              )}
-              <div>
-                <label className="mb-2 block font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">
-                  {trendBrief || anglePicked
-                    ? 'Or type your own angle (anchored to ONE signal, keep it tight):'
-                    : 'Type a custom angle to skip the scan (anchored to ONE signal):'}
-                </label>
-                <input
-                  type="text"
-                  value={customAngle}
-                  onChange={(e) => {
-                    setCustomAngle(e.target.value);
-                    if (e.target.value.trim()) setSelectedAngle('');
-                  }}
-                  placeholder="e.g. Why Altman's UBI walk-back kills the agency labor compact"
-                  className="w-full rounded-md border border-white/12 bg-white/[0.03] px-3 py-2.5 text-sm text-white placeholder:text-white/25"
-                />
+                <div>
+                  <label className="mb-2 block font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">
+                    Or type your own angle (anchored to ONE signal, keep it tight):
+                  </label>
+                  <input
+                    type="text"
+                    value={customAngle}
+                    onChange={(e) => {
+                      setCustomAngle(e.target.value);
+                      if (e.target.value.trim()) setSelectedAngle('');
+                    }}
+                    placeholder="e.g. Why Altman's UBI walk-back kills the agency labor compact"
+                    className="w-full rounded-md border border-white/12 bg-white/[0.03] px-3 py-2.5 text-sm text-white placeholder:text-white/25"
+                  />
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 
