@@ -6,9 +6,13 @@
 // (low double-digit founders, occasional updates). Production would want
 // a proper DB.
 //
-// Note on hosting: `fs.writeFileSync` works on local dev + Railway
-// (persistent FS). Vercel serverless has a read-only deploy FS — for that
-// target, swap to KV/Supabase.
+// Hosting notes:
+//   - local dev + Railway (persistent FS): writes go to ./.data/founders.json
+//   - Vercel: deployment root is read-only. Writes go to /tmp/.data/founders.json,
+//     which works WITHIN a warm lambda lifetime (~15min idle before recycle)
+//     but is ephemeral. Acceptable for a single demo session, NOT for real
+//     multi-user production. Swap to Vercel KV / Supabase for that.
+//   - Detection: process.env.VERCEL is auto-set to "1" on Vercel.
 
 import {
   readFileSync,
@@ -19,8 +23,15 @@ import {
 import path from 'path';
 import type { FounderProfile } from './types';
 
-const DATA_DIR = path.join(process.cwd(), '.data');
+const IS_VERCEL = !!process.env.VERCEL;
+const DATA_DIR = IS_VERCEL
+  ? path.join('/tmp', '.data')
+  : path.join(process.cwd(), '.data');
 const STORE_FILE = path.join(DATA_DIR, 'founders.json');
+
+if (IS_VERCEL) {
+  console.log('[store] Running on Vercel — using ephemeral /tmp store. Data lost on lambda recycle.');
+}
 
 // Use globalThis to survive Next.js dev HMR (each route reload re-imports modules).
 declare global {
