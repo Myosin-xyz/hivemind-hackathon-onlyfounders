@@ -22,6 +22,7 @@ import {
 } from 'fs';
 import path from 'path';
 import type { FounderProfile } from './types';
+import seedFoundersJson from './seed-founders.json';
 
 const IS_VERCEL = !!process.env.VERCEL;
 const DATA_DIR = IS_VERCEL
@@ -29,8 +30,14 @@ const DATA_DIR = IS_VERCEL
   : path.join(process.cwd(), '.data');
 const STORE_FILE = path.join(DATA_DIR, 'founders.json');
 
+// Seed founders bundled into the deployment. Used on Vercel cold start when
+// /tmp is empty so judges landing on /app always see a working demo founder
+// (Salo) regardless of which lambda instance they hit. Local dev ignores
+// this — it has its own persisted .data/founders.json.
+const SEED_FOUNDERS = seedFoundersJson as unknown as FounderProfile[];
+
 if (IS_VERCEL) {
-  console.log('[store] Running on Vercel — using ephemeral /tmp store. Data lost on lambda recycle.');
+  console.log('[store] Running on Vercel — using ephemeral /tmp store. Seeded on cold start.');
 }
 
 // Use globalThis to survive Next.js dev HMR (each route reload re-imports modules).
@@ -41,7 +48,23 @@ declare global {
 
 function loadFromDisk(): Map<string, FounderProfile> {
   try {
-    if (!existsSync(STORE_FILE)) return new Map();
+    if (!existsSync(STORE_FILE)) {
+      // Empty disk. On Vercel, populate from the bundled seed so judges
+      // landing on /app see a working demo founder immediately.
+      if (IS_VERCEL && SEED_FOUNDERS.length > 0) {
+        console.log(`[store] Vercel cold start — seeding ${SEED_FOUNDERS.length} founder(s) from bundle`);
+        const seeded = new Map(SEED_FOUNDERS.map((f) => [f.id, f]));
+        // Persist to /tmp so subsequent writes don't drop the seed.
+        try {
+          mkdirSync(DATA_DIR, { recursive: true });
+          writeFileSync(STORE_FILE, JSON.stringify(Array.from(seeded.values()), null, 2));
+        } catch (err) {
+          console.warn('[store] Failed to persist seed to /tmp:', err);
+        }
+        return seeded;
+      }
+      return new Map();
+    }
     const content = readFileSync(STORE_FILE, 'utf-8');
     const data = JSON.parse(content) as FounderProfile[];
     return new Map(data.map((f) => [f.id, f]));
