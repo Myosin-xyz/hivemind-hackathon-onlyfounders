@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
       niche = inferNiche(onboarded.enriched, body.description);
     }
 
-    const founder = createFounder({
+    const founder = await createFounder({
       name: body.name,
       websiteUrl: body.websiteUrl,
       description: body.description,

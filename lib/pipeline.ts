@@ -295,7 +295,7 @@ Subsequent messages will run: brief → draft → QC → revise → repurpose.`;
 
   // Persist the new conversation id so variations stage uses the same thread.
   // Each new draft cycle replaces it — no cross-cycle memory bleed.
-  updateFounder(founder.id, { conversationId: draftConversationId });
+  await updateFounder(founder.id, { conversationId: draftConversationId });
   const stagedFounder: FounderProfile = { ...founder, conversationId: draftConversationId };
 
   const results: Partial<Record<PipelineStep, string>> = {};

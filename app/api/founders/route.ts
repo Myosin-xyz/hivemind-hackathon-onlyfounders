@@ -9,14 +9,14 @@ export async function GET(req: NextRequest) {
   const id = req.nextUrl.searchParams.get('id');
 
   if (id) {
-    const founder = getFounder(id);
+    const founder = await getFounder(id);
     if (!founder) {
       return NextResponse.json({ error: 'not_found' }, { status: 404 });
     }
     return NextResponse.json({ founder });
   }
 
-  const founders = listFounders().map((f) => ({
+  const founders = (await listFounders()).map((f) => ({
     id: f.id,
     name: f.name,
     websiteUrl: f.websiteUrl,

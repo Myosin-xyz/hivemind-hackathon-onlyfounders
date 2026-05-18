@@ -15,7 +15,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const founder = getFounder(id);
+  const founder = await getFounder(id);
   if (!founder) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 });
   }
@@ -27,7 +27,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const existing = getFounder(id);
+  const existing = await getFounder(id);
   if (!existing) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 });
   }
@@ -47,7 +47,7 @@ export async function PATCH(
   if (Array.isArray(patch.keywords)) safe.keywords = patch.keywords;
   if (typeof patch.description === 'string') safe.description = patch.description;
 
-  const updated = updateFounder(id, safe);
+  const updated = await updateFounder(id, safe);
   return NextResponse.json({ founder: updated });
 }
 
@@ -56,7 +56,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const ok = deleteFounder(id);
+  const ok = await deleteFounder(id);
   if (!ok) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 });
   }

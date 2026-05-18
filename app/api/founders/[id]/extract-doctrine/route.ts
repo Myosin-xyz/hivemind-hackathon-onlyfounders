@@ -14,7 +14,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const founder = getFounder(id);
+  const founder = await getFounder(id);
 
   if (!founder) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 });

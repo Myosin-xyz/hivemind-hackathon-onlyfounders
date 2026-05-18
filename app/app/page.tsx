@@ -5,8 +5,8 @@ import { DeleteFounderButton } from './DeleteFounderButton';
 
 export const dynamic = 'force-dynamic';
 
-export default function AppHome() {
-  const founders = listFounders();
+export default async function AppHome() {
+  const founders = await listFounders();
 
   return (
     <main className="min-h-screen bg-of-black text-white">

@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const founder = getFounder(body.founderId);
+  const founder = await getFounder(body.founderId);
   if (!founder) {
     return Response.json({ error: 'founder_not_found' }, { status: 404 });
   }

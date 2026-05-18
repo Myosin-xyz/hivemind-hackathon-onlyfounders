@@ -1,18 +1,16 @@
-// Founder profile store — sync JSON-on-disk persistence so state survives
-// dev server restarts. In-memory Map serves reads; sync writes after every
-// mutation keep disk and memory aligned.
+// Founder profile store — two backends, picked by env:
 //
-// Cap: not designed for high write volume — fine for hackathon scale
-// (low double-digit founders, occasional updates). Production would want
-// a proper DB.
+//   Vercel KV (when KV_REST_API_URL is set):
+//     - shared across all lambda instances → no more "founder not found"
+//       after onboarding redirects across lambdas
+//     - one key per founder + a SET for the listing
+//     - seeded from lib/seed-founders.json on first use (Salo always present)
 //
-// Hosting notes:
-//   - local dev + Railway (persistent FS): writes go to ./.data/founders.json
-//   - Vercel: deployment root is read-only. Writes go to /tmp/.data/founders.json,
-//     which works WITHIN a warm lambda lifetime (~15min idle before recycle)
-//     but is ephemeral. Acceptable for a single demo session, NOT for real
-//     multi-user production. Swap to Vercel KV / Supabase for that.
-//   - Detection: process.env.VERCEL is auto-set to "1" on Vercel.
+//   Filesystem (everywhere else):
+//     - ./data/founders.json (or /tmp on Vercel without KV — legacy fallback)
+//     - keeps local dev working without KV credentials
+//
+// All exports are async — callers must await.
 
 import {
   readFileSync,
@@ -21,46 +19,61 @@ import {
   existsSync,
 } from 'fs';
 import path from 'path';
+import { kv } from '@vercel/kv';
 import type { FounderProfile } from './types';
 import seedFoundersJson from './seed-founders.json';
 
+const HAS_KV = !!process.env.KV_REST_API_URL;
 const IS_VERCEL = !!process.env.VERCEL;
+
+const SEED_FOUNDERS = seedFoundersJson as unknown as FounderProfile[];
+
+// FS path config (used only when !HAS_KV)
 const DATA_DIR = IS_VERCEL
   ? path.join('/tmp', '.data')
   : path.join(process.cwd(), '.data');
 const STORE_FILE = path.join(DATA_DIR, 'founders.json');
 
-// Seed founders bundled into the deployment. Used on Vercel cold start when
-// /tmp is empty so judges landing on /app always see a working demo founder
-// (Salo) regardless of which lambda instance they hit. Local dev ignores
-// this — it has its own persisted .data/founders.json.
-const SEED_FOUNDERS = seedFoundersJson as unknown as FounderProfile[];
+// KV key prefixes
+const KV_KEY = (id: string) => `of:founder:${id}`;
+const KV_LIST = 'of:founders:list';
+const KV_SEEDED_FLAG = 'of:seeded:v1';
 
-if (IS_VERCEL) {
-  console.log('[store] Running on Vercel — using ephemeral /tmp store. Seeded on cold start.');
+console.log(`[store] backend = ${HAS_KV ? 'vercel-kv' : 'filesystem'} (${IS_VERCEL ? 'vercel' : 'local'})`);
+
+// ─── KV: seed on first use ────────────────────────────────
+
+// Ensures the bundled seed founders are populated into KV the first time
+// it's used. Idempotent via the seeded flag. Safe to call on every request.
+async function ensureKvSeeded(): Promise<void> {
+  const flag = await kv.get<boolean>(KV_SEEDED_FLAG);
+  if (flag) return;
+
+  for (const f of SEED_FOUNDERS) {
+    await kv.set(KV_KEY(f.id), f);
+    await kv.sadd(KV_LIST, f.id);
+  }
+  await kv.set(KV_SEEDED_FLAG, true);
+  console.log(`[store] KV seeded with ${SEED_FOUNDERS.length} founder(s)`);
 }
 
-// Use globalThis to survive Next.js dev HMR (each route reload re-imports modules).
+// ─── Filesystem: legacy / local dev ───────────────────────
+
 declare global {
   // eslint-disable-next-line no-var
   var __onlyFoundersStore: Map<string, FounderProfile> | undefined;
 }
 
-function loadFromDisk(): Map<string, FounderProfile> {
+function fsLoad(): Map<string, FounderProfile> {
   try {
     if (!existsSync(STORE_FILE)) {
-      // Empty disk. On Vercel, populate from the bundled seed so judges
-      // landing on /app see a working demo founder immediately.
+      // Empty disk on Vercel → seed from bundle so /app shows Salo
       if (IS_VERCEL && SEED_FOUNDERS.length > 0) {
-        console.log(`[store] Vercel cold start — seeding ${SEED_FOUNDERS.length} founder(s) from bundle`);
         const seeded = new Map(SEED_FOUNDERS.map((f) => [f.id, f]));
-        // Persist to /tmp so subsequent writes don't drop the seed.
         try {
           mkdirSync(DATA_DIR, { recursive: true });
           writeFileSync(STORE_FILE, JSON.stringify(Array.from(seeded.values()), null, 2));
-        } catch (err) {
-          console.warn('[store] Failed to persist seed to /tmp:', err);
-        }
+        } catch {}
         return seeded;
       }
       return new Map();
@@ -69,61 +82,96 @@ function loadFromDisk(): Map<string, FounderProfile> {
     const data = JSON.parse(content) as FounderProfile[];
     return new Map(data.map((f) => [f.id, f]));
   } catch (err) {
-    console.warn('[store] Failed to load from disk, starting fresh:', err);
+    console.warn('[store] FS load failed:', err);
     return new Map();
   }
 }
 
-function persist(s: Map<string, FounderProfile>): void {
+function fsPersist(s: Map<string, FounderProfile>): void {
   try {
     mkdirSync(DATA_DIR, { recursive: true });
-    writeFileSync(
-      STORE_FILE,
-      JSON.stringify(Array.from(s.values()), null, 2),
-    );
+    writeFileSync(STORE_FILE, JSON.stringify(Array.from(s.values()), null, 2));
   } catch (err) {
-    console.error('[store] Persist failed:', err);
+    console.error('[store] FS persist failed:', err);
   }
 }
 
-const store: Map<string, FounderProfile> =
-  globalThis.__onlyFoundersStore ?? loadFromDisk();
+const fsStore: Map<string, FounderProfile> =
+  globalThis.__onlyFoundersStore ?? fsLoad();
 
 if (process.env.NODE_ENV !== 'production') {
-  globalThis.__onlyFoundersStore = store;
+  globalThis.__onlyFoundersStore = fsStore;
 }
+
+// ─── Public API (always async) ────────────────────────────
 
 function makeId(): string {
   return `f_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function createFounder(input: Omit<FounderProfile, 'id'>): FounderProfile {
+export async function createFounder(input: Omit<FounderProfile, 'id'>): Promise<FounderProfile> {
   const id = makeId();
   const founder: FounderProfile = { ...input, id };
-  store.set(id, founder);
-  persist(store);
+
+  if (HAS_KV) {
+    await ensureKvSeeded();
+    await kv.set(KV_KEY(id), founder);
+    await kv.sadd(KV_LIST, id);
+  } else {
+    fsStore.set(id, founder);
+    fsPersist(fsStore);
+  }
   return founder;
 }
 
-export function getFounder(id: string): FounderProfile | undefined {
-  return store.get(id);
+export async function getFounder(id: string): Promise<FounderProfile | undefined> {
+  if (HAS_KV) {
+    await ensureKvSeeded();
+    const founder = await kv.get<FounderProfile>(KV_KEY(id));
+    return founder ?? undefined;
+  }
+  return fsStore.get(id);
 }
 
-export function updateFounder(id: string, patch: Partial<FounderProfile>): FounderProfile {
-  const existing = store.get(id);
+export async function updateFounder(id: string, patch: Partial<FounderProfile>): Promise<FounderProfile> {
+  if (HAS_KV) {
+    await ensureKvSeeded();
+    const existing = await kv.get<FounderProfile>(KV_KEY(id));
+    if (!existing) throw new Error(`Founder ${id} not found`);
+    const updated: FounderProfile = { ...existing, ...patch };
+    await kv.set(KV_KEY(id), updated);
+    return updated;
+  }
+  const existing = fsStore.get(id);
   if (!existing) throw new Error(`Founder ${id} not found`);
   const updated = { ...existing, ...patch };
-  store.set(id, updated);
-  persist(store);
+  fsStore.set(id, updated);
+  fsPersist(fsStore);
   return updated;
 }
 
-export function listFounders(): FounderProfile[] {
-  return Array.from(store.values());
+export async function listFounders(): Promise<FounderProfile[]> {
+  if (HAS_KV) {
+    await ensureKvSeeded();
+    const ids = await kv.smembers(KV_LIST);
+    if (!ids || ids.length === 0) return [];
+    const keys = ids.map((id) => KV_KEY(String(id)));
+    const founders = await kv.mget<(FounderProfile | null)[]>(...keys);
+    return founders.filter((f): f is FounderProfile => f !== null);
+  }
+  return Array.from(fsStore.values());
 }
 
-export function deleteFounder(id: string): boolean {
-  const ok = store.delete(id);
-  if (ok) persist(store);
+export async function deleteFounder(id: string): Promise<boolean> {
+  if (HAS_KV) {
+    await ensureKvSeeded();
+    const existing = await kv.get(KV_KEY(id));
+    if (!existing) return false;
+    await kv.del(KV_KEY(id));
+    await kv.srem(KV_LIST, id);
+    return true;
+  }
+  const ok = fsStore.delete(id);
+  if (ok) fsPersist(fsStore);
   return ok;
 }
