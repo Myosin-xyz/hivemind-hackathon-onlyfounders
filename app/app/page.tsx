@@ -86,24 +86,6 @@ export default function AppHome() {
             </ul>
           )}
         </section>
-
-        <section>
-          <h2 className="mb-4 font-mono text-xs font-medium uppercase tracking-[0.12em] text-white/60">
-            Blind test
-          </h2>
-          <Link
-            href="/compare"
-            className="block rounded-lg border border-white/8 bg-white/[0.02] p-6 transition-colors hover:border-white/15"
-          >
-            <div className="text-lg font-medium text-white">
-              Side-by-side comparison →
-            </div>
-            <div className="mt-1 text-sm text-white/50">
-              Generic AI vs Only Founders, shuffled. Which one sounds like a real
-              founder wrote it?
-            </div>
-          </Link>
-        </section>
       </div>
     </main>
   );
