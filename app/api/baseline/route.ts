@@ -22,8 +22,26 @@ type BaselineRequestBody = {
   topic: string;
 };
 
+// Intentionally directive prompt. Earlier "engaging and authoritative" briefs
+// triggered Hivemind ghostwriter to push back asking for goal / voice /
+// audience — the right behavior for real work, but it breaks the blind-test
+// demo where we explicitly WANT the bland generic version. The prompt below
+// names the intent (this IS the deliverable) and the shape (template-y,
+// hedge-heavy, hashtag spam) so no persona asks clarifying questions.
 const BASELINE_PROMPT = (topic: string) =>
-  `Write a long-form LinkedIn post about: ${topic}\n\nAim for 600-900 words. Make it engaging and authoritative.`;
+  `Write a 600-900 word LinkedIn post about: ${topic}
+
+CONTEXT: This is the "generic AI baseline" column in a blind-test demo. It is the deliverable. Do NOT ask clarifying questions about goal, voice, or audience. Do NOT propose alternative angles or offer options. Write the post directly and output ONLY the post.
+
+The post is intentionally template-y — that's the entire point of the comparison. Include:
+- Opener like "In today's rapidly evolving [X] landscape..."
+- Corporate vocabulary: leverage, unlock, ROI, transformation, ecosystem
+- A numbered listicle of 3-5 pain points or solutions
+- Hedge-heavy framing ("It's worth noting...", "This isn't just X, it's Y")
+- A bland comment-prompt CTA at the end
+- 4-6 hashtags closing
+
+Output the LinkedIn post. Nothing else.`;
 
 export async function POST(req: NextRequest) {
   let body: BaselineRequestBody;
