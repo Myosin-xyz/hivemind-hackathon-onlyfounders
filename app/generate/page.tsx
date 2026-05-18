@@ -709,44 +709,48 @@ function GeneratePageInner() {
               )}
             </section>
 
-            {/* Step 1 footer — selected angle + custom input + Continue.
-                Top sticky bar handles the primary continue path; this block
-                stays for the custom-angle input. */}
+            {/* Step 1 footer — adapts to state:
+                - empty (no trendBrief, no anglePicked): just the custom-angle
+                  input on its own. No redundant "scan above" line, no
+                  disabled Continue button cluttering the empty state.
+                - trendBrief loaded OR angle picked: full footer with angle
+                  preview / scan-prompt + Continue to Draft button.
+                Custom-angle input is always visible — it's the escape valve. */}
             <div className="rounded-lg border border-white/8 bg-white/[0.02] p-4 space-y-3">
-              <div className="flex items-center justify-between gap-4">
-                <div className="min-w-0 flex-1">
-                  {anglePicked ? (
-                    <>
-                      <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">
-                        Selected angle
+              {(trendBrief || anglePicked) && (
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    {anglePicked ? (
+                      <>
+                        <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">
+                          Selected angle
+                        </div>
+                        <div className="text-sm text-white/85">
+                          {selectedAngle || customAngle}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-sm text-white/50">
+                        Click an angle chip above, or write your own below.
                       </div>
-                      <div className="text-sm text-white/85">
-                        {selectedAngle || customAngle}
-                      </div>
-                    </>
-                  ) : trendBrief ? (
-                    <div className="text-sm text-white/50">
-                      Click an angle chip above, or write your own below.
-                    </div>
-                  ) : (
-                    <div className="text-sm text-white/50">
-                      Scan trends above to see suggested angles, or write your own below.
-                    </div>
-                  )}
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveStep('draft')}
+                    disabled={!anglePicked}
+                    className="group inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-of-blue px-5 py-2.5 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-white transition-colors hover:bg-of-pink disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/30"
+                  >
+                    Continue to Draft
+                    <span aria-hidden className="transition-transform group-hover:translate-x-0.5">→</span>
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setActiveStep('draft')}
-                  disabled={!anglePicked}
-                  className="group inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-of-blue px-5 py-2.5 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-white transition-colors hover:bg-of-pink disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/30"
-                >
-                  Continue to Draft
-                  <span aria-hidden className="transition-transform group-hover:translate-x-0.5">→</span>
-                </button>
-              </div>
+              )}
               <div>
-                <label className="mb-1 block font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">
-                  Or type your own angle (anchored to ONE signal, keep it tight):
+                <label className="mb-2 block font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">
+                  {trendBrief || anglePicked
+                    ? 'Or type your own angle (anchored to ONE signal, keep it tight):'
+                    : 'Type a custom angle to skip the scan (anchored to ONE signal):'}
                 </label>
                 <input
                   type="text"
@@ -756,7 +760,7 @@ function GeneratePageInner() {
                     if (e.target.value.trim()) setSelectedAngle('');
                   }}
                   placeholder="e.g. Why Altman's UBI walk-back kills the agency labor compact"
-                  className="w-full rounded-md border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200"
+                  className="w-full rounded-md border border-white/12 bg-white/[0.03] px-3 py-2.5 text-sm text-white placeholder:text-white/25"
                 />
               </div>
             </div>
