@@ -26,13 +26,25 @@ async function fetchReddit(topic: string, days: number): Promise<RawSignal[]> {
   url.searchParams.set('t', daysToRedditWindow(days));
   url.searchParams.set('limit', '25');
 
-  try {
-    const res = await fetch(url.toString(), {
-      headers: { 'User-Agent': USER_AGENT },
+  // Reddit aggressively rate-limits anonymous /search.json calls and has
+  // started returning 429 / 403 for some User-Agent strings. Retry once
+  // after a brief wait if we get rate-limited, and log enough to debug.
+  async function attempt(): Promise<Response> {
+    return fetch(url.toString(), {
+      headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
       cache: 'no-store',
     });
+  }
+
+  try {
+    let res = await attempt();
+    if (res.status === 429 || res.status === 403) {
+      console.warn(`[trends] Reddit ${res.status} on first attempt, retrying once after 800ms`);
+      await new Promise((r) => setTimeout(r, 800));
+      res = await attempt();
+    }
     if (!res.ok) {
-      console.warn(`[trends] Reddit fetch failed: ${res.status}`);
+      console.warn(`[trends] Reddit fetch failed: ${res.status} for q="${topic}"`);
       return [];
     }
     const data = await res.json();
@@ -133,7 +145,15 @@ async function fetchPolymarket(topic: string): Promise<RawSignal[]> {
     const events = await res.json();
     if (!Array.isArray(events)) return [];
 
-    const keywords = topic.toLowerCase().split(/\s+/).filter(k => k.length > 2);
+    // Keyword filter: previously dropped any word <= 2 chars, which killed
+    // "ai" entirely. Now keeps anything 2 chars or longer (still drops
+    // single-letter noise). Common stopwords filtered separately.
+    const STOPWORDS = new Set(['the', 'and', 'or', 'of', 'in', 'on', 'at', 'to', 'for', 'a', 'an']);
+    const keywords = topic
+      .toLowerCase()
+      .split(/\s+/)
+      .map((k) => k.trim())
+      .filter((k) => k.length >= 2 && !STOPWORDS.has(k));
     if (keywords.length === 0) return [];
 
     return events

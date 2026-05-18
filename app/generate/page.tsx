@@ -556,7 +556,7 @@ function GeneratePageInner() {
             <section>
               <h2 className="mb-2 text-lg font-semibold">Trends + Angle</h2>
               <p className="mb-3 text-sm text-white/55">
-                Pulls Reddit, Hacker News, Polymarket, and X (via Beacon)
+                Pulls Reddit, Hacker News, Polymarket, and X
                 from the last 30 days. Each conversation and whitespace gap
                 surfaces tight angle suggestions anchored to one signal.
                 Pick a topic and scan.
@@ -605,7 +605,7 @@ function GeneratePageInner() {
                   </p>
                   <p className="mt-2 max-w-md mx-auto text-sm text-white/65">
                     No signals scanned yet. Click <span className="font-medium text-of-blue">Scan trends</span> above
-                    to pull the last 30 days from Reddit, Hacker News, Polymarket, and X (via Beacon),
+                    to pull the last 30 days from Reddit, Hacker News, Polymarket, and X,
                     grounded in {founder?.name ?? 'this founder'}&apos;s project context.
                     Takes 20-40s.
                   </p>
@@ -619,7 +619,7 @@ function GeneratePageInner() {
                       <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-of-blue opacity-60" />
                       <span className="relative inline-flex h-2 w-2 rounded-full bg-of-blue" />
                     </span>
-                    Scanning Reddit · Hacker News · Polymarket · X (Beacon)
+                    Scanning Reddit · Hacker News · Polymarket · X
                   </div>
                   <p className="mt-2 text-xs text-white/40">
                     Hivemind synthesizing brief from {trendsTopic} signals — ~30s
