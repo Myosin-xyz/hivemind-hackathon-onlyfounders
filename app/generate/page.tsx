@@ -210,13 +210,14 @@ function GeneratePageInner() {
           setFounder({ name: data.founder.name, niche: data.founder.niche });
           const initialTopic = data.founder.niche?.replace(/-/g, ' ') ?? 'ai marketing';
           setTrendsTopic(initialTopic);
-          // Cache hit (under 1h old) = instant render, no API call
+          // Cache hit (under 1h old) = instant render, no API call.
+          // Cache miss = wait for the user to hit "Scan trends" — don't
+          // auto-fire the fetch on landing; it's a several-second job that
+          // shouldn't run unless the user asked for it.
           const cached = loadCachedTrends(founderId, initialTopic);
           if (cached) {
             setTrendBrief(cached);
             setSignalBrief(cached.brief);
-          } else {
-            void fetchTrends(initialTopic);
           }
         }
       })
@@ -554,8 +555,11 @@ function GeneratePageInner() {
 
             <section>
               <h2 className="mb-2 text-lg font-semibold">Trends + Angle</h2>
-              <p className="mb-3 text-sm text-neutral-400">
-                Auto-fetched from Reddit, Hacker News, and Polymarket — last 30 days. Each conversation and whitespace gap comes with tight angle suggestions anchored to that one signal. Click an angle to pick it, or write your own at the bottom.
+              <p className="mb-3 text-sm text-white/55">
+                Pulls Reddit, Hacker News, and Polymarket from the last 30
+                days. Each conversation and whitespace gap surfaces tight
+                angle suggestions anchored to one signal. Pick a topic and
+                scan.
               </p>
 
               <div className="mb-3 flex gap-2">
@@ -570,27 +574,57 @@ function GeneratePageInner() {
                     }
                   }}
                   placeholder="ai marketing"
-                  className="flex-1 rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-200"
+                  className="flex-1 rounded-md border border-white/12 bg-white/[0.03] px-3 py-2 text-sm text-white placeholder:text-white/25"
                 />
                 <button
                   type="button"
                   onClick={() => void fetchTrends(trendsTopic)}
                   disabled={trendsLoading || !trendsTopic.trim()}
-                  className="rounded-md border border-neutral-700 px-4 py-2 text-sm hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="group inline-flex items-center gap-1.5 rounded-full border border-of-blue/50 bg-of-blue/[0.08] px-5 py-2 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-of-blue transition-[background-color,border-color,color] hover:border-of-pink hover:bg-of-pink hover:text-white disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-of-blue/50 disabled:hover:bg-of-blue/[0.08] disabled:hover:text-of-blue"
                 >
-                  {trendsLoading ? 'Fetching…' : 'Refresh'}
+                  {trendsLoading ? 'Scanning…' : trendBrief ? '↻ Rescan' : 'Scan trends'}
+                  {!trendsLoading && (
+                    <span aria-hidden className="transition-transform group-hover:translate-x-0.5">→</span>
+                  )}
                 </button>
               </div>
 
               {trendsError && (
-                <div className="mb-3 rounded-md border border-red-900 bg-red-950/50 px-3 py-2 text-xs text-red-300">
+                <div className="mb-3 rounded-md border border-of-orange/40 bg-of-orange/10 px-3 py-2 text-xs text-of-orange">
                   {trendsError}
                 </div>
               )}
 
+              {/* Empty state — no scan yet, no cache hit. Big call to action. */}
+              {!trendBrief && !trendsLoading && !trendsError && (
+                <div className="rounded-lg border border-dashed border-white/12 bg-white/[0.02] p-10 text-center">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">
+                    Step 1
+                  </p>
+                  <p className="mt-2 max-w-md mx-auto text-sm text-white/65">
+                    No signals scanned yet. Click <span className="font-medium text-of-blue">Scan trends</span> above
+                    to pull the last 30 days from Reddit, Hacker News, and Polymarket,
+                    grounded in {founder?.name ?? 'this founder'}&apos;s project context.
+                    Takes 20-40s.
+                  </p>
+                  <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.14em] text-white/30">
+                    Or skip ahead and type a custom angle below
+                  </p>
+                </div>
+              )}
+
               {trendsLoading && !trendBrief && (
-                <div className="rounded-md border border-neutral-800 bg-neutral-900 p-6 text-center text-sm text-neutral-400">
-                  Fetching from Reddit + Hacker News + Polymarket…
+                <div className="rounded-lg border border-of-blue/25 bg-of-blue/[0.04] p-6 text-center text-sm text-of-blue">
+                  <div className="inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.12em]">
+                    <span className="relative flex h-2 w-2">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-of-blue opacity-60" />
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-of-blue" />
+                    </span>
+                    Scanning Reddit · Hacker News · Polymarket
+                  </div>
+                  <p className="mt-2 text-xs text-white/40">
+                    Hivemind synthesizing brief from {trendsTopic} signals — ~30s
+                  </p>
                 </div>
               )}
 
@@ -690,9 +724,13 @@ function GeneratePageInner() {
                         {selectedAngle || customAngle}
                       </div>
                     </>
+                  ) : trendBrief ? (
+                    <div className="text-sm text-white/50">
+                      Click an angle chip above, or write your own below.
+                    </div>
                   ) : (
                     <div className="text-sm text-white/50">
-                      Click an angle chip above, or write your own below
+                      Scan trends above to see suggested angles, or write your own below.
                     </div>
                   )}
                 </div>
