@@ -23,13 +23,24 @@ function shuffle<T>(arr: T[]): T[] {
   return result;
 }
 
+// Available pre-baked demo cases. Each maps to public/demo-cases/{id}.json.
+// Add a new case: drop a JSON file in that folder with the same schema,
+// add an entry here. Defaults to the first case for "Load demo" CTA.
+const DEMO_CASES: ReadonlyArray<{ id: string; name: string }> = [
+  { id: 'salo',  name: 'Salo' },
+  { id: 'blake', name: 'Blake' },
+  { id: 'mark',  name: 'Mark' },
+  { id: 'simon', name: 'Simon' },
+];
+
 export default function ComparePage() {
   const [topic, setTopic] = useState('');
   const [genericClaude, setGenericClaude] = useState('');
   const [onlyFounders, setOnlyFounders] = useState('');
+  const [founderName, setFounderName] = useState<string>('');
 
   const [running, setRunning] = useState(false);
-  const [loadingDemo, setLoadingDemo] = useState(false);
+  const [loadingDemoId, setLoadingDemoId] = useState<string | null>(null);
   const [columns, setColumns] = useState<Column[]>([]);
   const [revealed, setRevealed] = useState(false);
 
@@ -55,24 +66,25 @@ export default function ComparePage() {
     }
   }
 
-  async function loadDemo() {
-    setLoadingDemo(true);
+  async function loadDemo(caseId: string) {
+    setLoadingDemoId(caseId);
     try {
-      const res = await fetch('/demo-cases/salo.json', { cache: 'no-store' });
+      const res = await fetch(`/demo-cases/${caseId}.json`, { cache: 'no-store' });
       if (!res.ok) {
-        alert('Demo case not found at /demo-cases/salo.json');
+        alert(`Demo case not found at /demo-cases/${caseId}.json`);
         return;
       }
       const data = await res.json();
       setTopic(data.topic ?? '');
       setOnlyFounders(data.onlyFounders ?? '');
+      setFounderName(data.founderName ?? DEMO_CASES.find((c) => c.id === caseId)?.name ?? '');
       if (data.genericClaude && String(data.genericClaude).trim()) {
         setGenericClaude(data.genericClaude);
       } else if (data.topic) {
         await generateBaseline(data.topic);
       }
     } finally {
-      setLoadingDemo(false);
+      setLoadingDemoId(null);
     }
   }
 
@@ -133,11 +145,12 @@ export default function ComparePage() {
             onLoadBlindTest={loadBlindTest}
             onLoadDemo={loadDemo}
             running={running}
-            loadingDemo={loadingDemo}
+            loadingDemoId={loadingDemoId}
           />
         ) : (
           <BlindTestView
             topic={topic}
+            founderName={founderName}
             columns={columns}
             revealed={revealed}
             onReveal={() => setRevealed(true)}
@@ -170,16 +183,16 @@ function SetupPanel(props: {
   setOnlyFounders: (s: string) => void;
   onGenerateBaseline: () => void;
   onLoadBlindTest: () => void;
-  onLoadDemo: () => void;
+  onLoadDemo: (caseId: string) => void;
   running: boolean;
-  loadingDemo: boolean;
+  loadingDemoId: string | null;
 }) {
   const ready = props.genericClaude.trim() && props.onlyFounders.trim();
 
   return (
     <div className="space-y-6">
-      {/* Demo loader strip — outline button matching the rest of the app */}
-      <div className="flex items-center justify-between rounded-lg border border-of-blue/20 bg-of-blue/[0.04] px-5 py-3.5">
+      {/* Demo loader strip — pick which founder's case to load for this round */}
+      <div className="flex flex-col gap-3 rounded-lg border border-of-blue/20 bg-of-blue/[0.04] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <span className="block h-1.5 w-1.5 rounded-full bg-of-blue" />
           <div className="text-sm text-of-black/75">
@@ -187,15 +200,26 @@ function SetupPanel(props: {
             pre-filled case to skip the paste step.
           </div>
         </div>
-        <button
-          type="button"
-          onClick={props.onLoadDemo}
-          disabled={props.loadingDemo}
-          className="group inline-flex items-center gap-1.5 rounded-full border border-of-blue/50 bg-of-blue/[0.08] px-4 py-1.5 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-of-blue transition-[background-color,border-color,color] hover:border-of-pink hover:bg-of-pink hover:text-white disabled:opacity-40"
-        >
-          {props.loadingDemo ? 'Loading…' : 'Load Salo demo'}
-          <span aria-hidden className="transition-transform group-hover:translate-x-0.5">→</span>
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {DEMO_CASES.map((c) => {
+            const isLoading = props.loadingDemoId === c.id;
+            const isDisabled = props.loadingDemoId !== null;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => props.onLoadDemo(c.id)}
+                disabled={isDisabled}
+                className="group inline-flex items-center gap-1.5 rounded-full border border-of-blue/50 bg-of-blue/[0.08] px-4 py-1.5 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-of-blue transition-[background-color,border-color,color] hover:border-of-pink hover:bg-of-pink hover:text-white disabled:opacity-40"
+              >
+                {isLoading ? 'Loading…' : c.name}
+                {!isLoading && (
+                  <span aria-hidden className="transition-transform group-hover:translate-x-0.5">→</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Three inputs as a vertical stack with paired column-letter badges */}
@@ -288,6 +312,7 @@ function SectionHeader({
 
 function BlindTestView(props: {
   topic: string;
+  founderName: string;
   columns: Column[];
   revealed: boolean;
   onReveal: () => void;
@@ -368,12 +393,14 @@ function BlindTestView(props: {
                   : 'border-of-black/10 shadow-[0_1px_3px_rgba(0,0,0,0.04)]'
               }`}
             >
-              {/* Winner ribbon — only after reveal, on the OF column */}
+              {/* Winner ribbon — only after reveal, on the OF column.
+                  Includes the founder's name when known so the audience
+                  knows whose voice this output matched. */}
               {isWinner && (
                 <div className="pointer-events-none absolute -top-2.5 left-6">
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-of-blue px-3 py-1 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-white shadow-[0_2px_8px_rgba(26,109,255,0.4)]">
                     <span className="block h-1.5 w-1.5 rounded-full bg-white" />
-                    Only Founders
+                    Only Founders{props.founderName ? ` · ${props.founderName}` : ''}
                   </span>
                 </div>
               )}

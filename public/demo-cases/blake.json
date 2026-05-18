@@ -1,0 +1,7 @@
+{
+  "_note": "Blake demo case. Generate Blake's pillar on the topic via /generate?founderId={blake-id}, then paste the revised_pillar output into onlyFounders. genericClaude can be left empty — /api/baseline will populate via Hivemind on load.",
+  "founderName": "Blake",
+  "topic": "Why most AI agents start from zero every session",
+  "genericClaude": "",
+  "onlyFounders": "[REPLACE BEFORE DEMO] Paste the revised pillar from /generate for Blake on this topic. Same topic as Salo's case so the room can directly compare voice differentiation."
+}
