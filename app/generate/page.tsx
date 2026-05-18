@@ -463,7 +463,7 @@ function GeneratePageInner() {
 
   return (
     <main className="min-h-screen bg-of-black text-white">
-      <div className="mx-auto max-w-7xl px-6 py-8">
+      <div className="mx-auto max-w-7xl px-6 pb-20 pt-8">
         <header className="mb-8 flex items-end justify-between gap-6">
           <div>
             <Link
@@ -988,7 +988,7 @@ function BottomBar({
   const slug = founderName?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') ?? '';
 
   return (
-    <div className="mt-12 border-t border-white/8 bg-white/[0.015] px-6 py-3">
+    <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-of-black/85 px-6 py-3 backdrop-blur-md">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
         <div className="flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.12em] text-white/30">
           <span>hivemind project</span>
