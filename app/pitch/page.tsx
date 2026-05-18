@@ -115,6 +115,54 @@ export default function PitchPage() {
             (launch planner) are deliberately unused. Every call goes to the
             specialist whose lane it sits in.
           </p>
+
+          {/* Expandable touchpoint map — every place Hivemind plugs in,
+              grouped by pipeline stage. Default collapsed; opening shows
+              the full integration depth. */}
+          <details className="group mt-6 border-t border-white/8 pt-5">
+            <summary className="cursor-pointer list-none font-mono text-[11px] uppercase tracking-[0.14em] text-white/55 transition-colors hover:text-white/80">
+              <span className="inline-block transition-transform group-open:rotate-90">›</span>
+              <span className="ml-2">Show every Hivemind touchpoint by stage</span>
+            </summary>
+            <div className="mt-5 space-y-5">
+              <TouchpointStage
+                num="01"
+                stage="Onboard"
+                touchpoints={[
+                  { call: 'project enrichment', persona: 'hivemind', detail: 'scrapes site, extracts audiences + stage' },
+                  { call: 'voice extraction', persona: 'ghostwriter', detail: 'from samples, OR interprets Beacon stylometry when onboarding via @handle' },
+                ]}
+              />
+              <TouchpointStage
+                num="02"
+                stage="Pick signal"
+                touchpoints={[
+                  { call: 'trend brief synthesis', persona: 'genius-strategist', detail: 'ranks signals from Reddit / HN / Polymarket / X, grounded in this founder’s project context' },
+                  { call: 'per-signal angles', persona: 'genius-strategist', detail: '1-2 tight angles anchored to each single signal' },
+                ]}
+              />
+              <TouchpointStage
+                num="03"
+                stage="Draft"
+                touchpoints={[
+                  { call: 'brief', persona: 'genius-strategist', detail: 'pillar spine, frames the argument' },
+                  { call: 'draft pillar', persona: 'ghostwriter', detail: 'voice-loaded production-ready copy' },
+                  { call: 'QC (8 lenses)', persona: 'genius-strategist', detail: 'editor review, anti-AI-slop, focus discipline' },
+                  { call: 'revised pillar', persona: 'ghostwriter', detail: 'applies QC, ship-ready' },
+                ]}
+              />
+              <TouchpointStage
+                num="04"
+                stage="Repurpose · one conversation, all four"
+                touchpoints={[
+                  { call: 'X thread', persona: 'ghostwriter', detail: 'hook-engineered first tweet, no thread signaling' },
+                  { call: 'LinkedIn', persona: 'ghostwriter', detail: 'native short-form, not the pillar shortened' },
+                  { call: 'Newsletter', persona: 'ghostwriter', detail: 'personal register' },
+                  { call: 'Pull quotes', persona: 'ghostwriter', detail: '5 standalone quotes for cards / social' },
+                ]}
+              />
+            </div>
+          </details>
         </section>
 
         {/* The proof — elevates the blind test from secondary link to a real beat */}
@@ -223,4 +271,55 @@ function PersonaRow({
       </div>
     </div>
   );
+}
+
+// Single stage block in the expanded touchpoint map. Lists every Hivemind
+// call that runs inside that pipeline stage, color-coded by persona.
+function TouchpointStage({
+  num,
+  stage,
+  touchpoints,
+}: {
+  num: string;
+  stage: string;
+  touchpoints: Array<{ call: string; persona: string; detail: string }>;
+}) {
+  return (
+    <div>
+      <div className="mb-2 flex items-baseline gap-2 font-mono text-[10px] uppercase tracking-[0.14em]">
+        <span className="text-white/35">{num}</span>
+        <span className="text-white/75">{stage}</span>
+      </div>
+      <ul className="space-y-1.5 pl-4">
+        {touchpoints.map((t) => (
+          <li key={t.call} className="grid grid-cols-1 gap-x-3 gap-y-0.5 md:grid-cols-[140px_1fr] md:items-baseline">
+            <div className="flex items-baseline gap-2">
+              <span className={`block h-1 w-1 rounded-full ${personaDotClass(t.persona)}`} />
+              <span className="text-sm text-white/90">{t.call}</span>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <code className={`shrink-0 rounded bg-of-black/60 px-1.5 py-0.5 font-mono text-[10px] ${personaTextClass(t.persona)}`}>
+                {t.persona}
+              </code>
+              <span className="text-xs text-white/45">{t.detail}</span>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function personaDotClass(persona: string): string {
+  if (persona === 'ghostwriter') return 'bg-of-blue';
+  if (persona === 'genius-strategist') return 'bg-of-gold';
+  if (persona === 'hivemind') return 'bg-of-green';
+  return 'bg-white/40';
+}
+
+function personaTextClass(persona: string): string {
+  if (persona === 'ghostwriter') return 'text-of-blue';
+  if (persona === 'genius-strategist') return 'text-of-gold';
+  if (persona === 'hivemind') return 'text-of-green';
+  return 'text-white/60';
 }
