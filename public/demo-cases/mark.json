@@ -1,7 +1,7 @@
 {
-  "_note": "Mark Mason demo case. Generate Mark's pillar on the topic via /generate?founderId={mark-id}, then paste the revised_pillar output into onlyFounders. genericClaude can be left empty — /api/baseline will populate via Hivemind on load.",
-  "founderName": "Mark Mason",
+  "_note": "Pre-baked Mark Manson voice pillar. Same topic as Salo's case so the room can compare voice differentiation directly. Uses Mark's signature moves: labeled idea hook (The Memory Tax), no first-person, antithesis-as-doctrine, clipped imperative close.",
+  "founderName": "Mark Manson",
   "topic": "Why most AI agents start from zero every session",
   "genericClaude": "",
-  "onlyFounders": "[REPLACE BEFORE DEMO] Paste the revised pillar from /generate for Mark on this topic. Same topic as Salo's case so the room can directly compare voice differentiation."
+  "onlyFounders": "The Memory Tax.\n\nMost people pay it every day without noticing.\n\nEvery morning you re-explain yourself. To your team. To your spouse. To the AI you opened ten minutes ago that has no idea who you are.\n\nYou accept this when humans do it. You call it \"catching up.\" It's polite.\n\nWhen a machine does it, you call it broken.\n\nThe machine isn't broken. The machine is honest. It's showing you, in compressed time, what your day actually looks like.\n\nForty minutes of context restoration disguised as work.\n\nThe cure isn't a smarter machine. It's a habit.\n\nYou write things down once. You feed them back in. You stop trusting your own ability to remember why a decision mattered six months ago.\n\nMost people won't do this. The machine starts over. You start over. Both of you do it again tomorrow.\n\nThe trade-off of a fresh slate is that nothing compounds.\n\nThe trade-off of a long memory is that you have to be honest about what was in it.\n\nPick one."
 }

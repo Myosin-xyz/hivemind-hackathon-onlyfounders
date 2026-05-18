@@ -1,7 +1,7 @@
 {
-  "_note": "Blake demo case. Generate Blake's pillar on the topic via /generate?founderId={blake-id}, then paste the revised_pillar output into onlyFounders. genericClaude can be left empty — /api/baseline will populate via Hivemind on load.",
+  "_note": "Pre-baked Blake voice pillar. Operator-evangelist register. Verdict cold open, triadic stacking, fork declaration, compressed maxim close. Same topic as Salo's case so the room can compare voice differentiation directly.",
   "founderName": "Blake",
   "topic": "Why most AI agents start from zero every session",
   "genericClaude": "",
-  "onlyFounders": "[REPLACE BEFORE DEMO] Paste the revised pillar from /generate for Blake on this topic. Same topic as Salo's case so the room can directly compare voice differentiation."
+  "onlyFounders": "Biggest founder trap with AI right now: thinking the model is the moat.\n\nEvery new release. Same routine.\n\nSpin it up. Re-explain the project. Re-paste the doctrine. Re-tell the agent what your team agreed on last Tuesday. Watch it confidently produce work it would have produced six months ago when the model was half as smart.\n\nNot the model. Not the prompt. Not the wrapper.\n\nThe memory.\n\nBuilders shipping AI products in 2026 are choosing between two roads. One: keep upgrading the model and pretending the upgrades compound. They don't. Every session is a clean slate, every advantage resets, the next model release flattens whatever moat you thought you were building.\n\nTwo: write the persistent layer. The thing your agent reads, writes, and reasons against between sessions. Doctrine, decisions, customer language, what worked, what didn't.\n\nThat layer compounds. The model gets cheap. The memory gets expensive.\n\nPick the road that builds you a stack of receipts, not a subscription.\n\nBuild the memory."
 }

@@ -1,7 +1,7 @@
 {
-  "_note": "Simon demo case. First onboard Simon as a founder via /onboard, then generate his pillar on the topic via /generate?founderId={simon-id}, then paste the revised_pillar output into onlyFounders. genericClaude can be left empty — /api/baseline will populate via Hivemind on load.",
+  "_note": "Pre-baked Simon voice pillar. Practitioner-operator register. Concept label hook (Session Amnesia:), metaphor reframe (Models are pipes), operator equations (+ and =), minimum viable everything, open question close. Same topic as Salo's case so the room can compare voice differentiation directly.",
   "founderName": "Simon",
   "topic": "Why most AI agents start from zero every session",
   "genericClaude": "",
-  "onlyFounders": "[REPLACE BEFORE DEMO] Paste the revised pillar from /generate for Simon on this topic. Same topic as Salo's case so the room can directly compare voice differentiation."
+  "onlyFounders": "Session Amnesia: the gap between what your AI agent knew yesterday and what it knows today.\n\nMost teams treat this like a bug.\n\nIt isn't. It's the default.\n\nModels are pipes. People don't care about pipes.\n\nWhat they care about: did the agent remember the decision you made about brand voice? Did it remember why the last campaign flopped? Did it remember the doctrine you wrote down in week one?\n\nProbably not.\n\nRe-explaining context + every new session = your team paying the memory tax forever.\n\nPersistent vault + every new session = your agent walking in with the playbook open.\n\nThe first option scales with how fast you can talk. The second scales with how much you've written down.\n\nFor early teams shipping AI-augmented work, consider minimum viable memory. Three documents. Doctrine, decisions, voice profile. Update on Fridays. Feed them in on Mondays.\n\nWe are getting tighter with every turn.\n\nIs your agent compounding, or is it starting over?"
 }
