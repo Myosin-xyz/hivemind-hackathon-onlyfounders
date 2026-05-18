@@ -215,11 +215,19 @@ async function synthesizeTrends(
 
   const compact = compactSignalsForPrompt(signals);
 
+  const sourcesInPool = Array.from(new Set(compact.map((s) => s.source)));
+  const sourceLabels = sourcesInPool.map((s) =>
+    s === 'reddit' ? 'Reddit' :
+    s === 'hackernews' ? 'Hacker News' :
+    s === 'polymarket' ? 'Polymarket' :
+    s === 'beacon-x' ? 'X / Twitter (via Beacon)' : s,
+  );
+
   const prompt = `Synthesize a trend brief from these multi-platform signals.
 
 TOPIC: ${topic}
 LOOKBACK: last ${days} days
-SOURCES: Reddit, Hacker News, Polymarket
+SOURCES: ${sourceLabels.join(', ')}
 
 RAW SIGNALS (sorted by engagement, top ${compact.length}):
 ${JSON.stringify(compact)}
@@ -349,15 +357,48 @@ export async function fetchTrends(
   const days = options.days ?? 30;
   const enabledSources = options.sources ?? ['reddit', 'hackernews', 'polymarket', 'beacon-x'];
 
-  const tasks: Promise<RawSignal[]>[] = [];
-  if (enabledSources.includes('reddit')) tasks.push(fetchReddit(topic, days));
-  if (enabledSources.includes('hackernews')) tasks.push(fetchHackerNews(topic, days));
-  if (enabledSources.includes('polymarket')) tasks.push(fetchPolymarket(topic));
-  if (enabledSources.includes('beacon-x') && options.niche) {
-    tasks.push(fetchBeaconX(options.niche));
+  // Track per-source attempt state so the UI / log can show why a source
+  // returned no signals (skipped because not configured / missing input,
+  // attempted but came back empty, or successful with N).
+  const attemptedSources: TrendSource[] = [];
+  const skippedSources: Array<{ source: TrendSource; reason: string }> = [];
+
+  const tasks: Array<{ source: TrendSource; task: Promise<RawSignal[]> }> = [];
+  if (enabledSources.includes('reddit')) {
+    attemptedSources.push('reddit');
+    tasks.push({ source: 'reddit', task: fetchReddit(topic, days) });
+  }
+  if (enabledSources.includes('hackernews')) {
+    attemptedSources.push('hackernews');
+    tasks.push({ source: 'hackernews', task: fetchHackerNews(topic, days) });
+  }
+  if (enabledSources.includes('polymarket')) {
+    attemptedSources.push('polymarket');
+    tasks.push({ source: 'polymarket', task: fetchPolymarket(topic) });
+  }
+  if (enabledSources.includes('beacon-x')) {
+    if (!beacon.beaconConfigured) {
+      skippedSources.push({ source: 'beacon-x', reason: 'beacon not configured (BEACON_API_URL / BEACON_API_KEY missing)' });
+    } else if (!options.niche) {
+      skippedSources.push({ source: 'beacon-x', reason: 'founder has no niche set — Beacon X feed is niche-scoped' });
+    } else {
+      attemptedSources.push('beacon-x');
+      tasks.push({ source: 'beacon-x', task: fetchBeaconX(options.niche) });
+    }
   }
 
-  const results = await Promise.all(tasks);
+  const results = await Promise.all(tasks.map((t) => t.task));
+  const perSourceCounts: Record<string, number> = {};
+  results.forEach((signals, i) => {
+    perSourceCounts[tasks[i].source] = signals.length;
+  });
+
+  // Diagnostic — surfaces in `npm run dev` server console.
+  console.log('[trends] fetch for topic="' + topic + '" niche=' + (options.niche ?? '∅') + ':', {
+    perSourceCounts,
+    skipped: skippedSources,
+  });
+
   const allSignals = results.flat();
 
   // Compute the sources we actually pulled data from (in case some returned empty)
@@ -369,7 +410,10 @@ export async function fetchTrends(
     return {
       topic,
       generated_at: new Date().toISOString(),
-      sources_used: enabledSources,
+      sources_used: [],
+      sources_attempted: attemptedSources,
+      sources_skipped: skippedSources,
+      per_source_counts: perSourceCounts,
       raw_count: 0,
       signals: [],
       brief: `No signals found for "${topic}" across ${enabledSources.join(', ')} in the last ${days} days. Try a broader topic or a longer window.`,
@@ -390,6 +434,9 @@ export async function fetchTrends(
     topic,
     generated_at: new Date().toISOString(),
     sources_used: sourcesWithSignals,
+    sources_attempted: attemptedSources,
+    sources_skipped: skippedSources,
+    per_source_counts: perSourceCounts,
     raw_count: allSignals.length,
     signals: sorted.slice(0, 50),
     brief,

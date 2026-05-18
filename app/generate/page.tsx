@@ -639,16 +639,46 @@ function GeneratePageInner() {
                         Hivemind project context
                       </span>
                     )}
-                    {Object.entries(countBySource(trendBrief.signals)).map(([src, count]) => (
-                      <span
-                        key={src}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-white/70"
-                      >
+                    {/* Attempted sources — show ALL with their counts (even 0).
+                        Replaces the prior "only sources with signals" filter
+                        so X / Beacon doesn't silently disappear when empty. */}
+                    {(trendBrief.sources_attempted ?? Object.keys(countBySource(trendBrief.signals)) as string[]).map((src) => {
+                      const count = trendBrief.per_source_counts?.[src]
+                        ?? countBySource(trendBrief.signals)[src]
+                        ?? 0;
+                      const isEmpty = count === 0;
+                      return (
                         <span
-                          className={`block h-1.5 w-1.5 rounded-full ${SOURCE_DOT[src] ?? 'bg-white/40'}`}
-                        />
-                        {SOURCE_LABELS[src] ?? src}
-                        <span className="text-white/35">({count})</span>
+                          key={src}
+                          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] ${
+                            isEmpty
+                              ? 'border-white/8 bg-white/[0.02] text-white/35'
+                              : 'border-white/10 bg-white/[0.04] text-white/70'
+                          }`}
+                          title={isEmpty ? 'Attempted, no signals returned for this topic' : ''}
+                        >
+                          <span
+                            className={`block h-1.5 w-1.5 rounded-full ${
+                              isEmpty ? 'bg-white/20' : SOURCE_DOT[src] ?? 'bg-white/40'
+                            }`}
+                          />
+                          {SOURCE_LABELS[src] ?? src}
+                          <span className={isEmpty ? 'text-white/25' : 'text-white/35'}>
+                            ({count})
+                          </span>
+                        </span>
+                      );
+                    })}
+                    {/* Skipped sources — enabled but bailed pre-fetch */}
+                    {trendBrief.sources_skipped?.map(({ source, reason }) => (
+                      <span
+                        key={source}
+                        title={reason}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-of-orange/25 bg-of-orange/[0.04] px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-of-orange/70"
+                      >
+                        <span className="block h-1.5 w-1.5 rounded-full bg-of-orange/60" />
+                        {SOURCE_LABELS[source] ?? source}
+                        <span className="text-of-orange/50">skipped</span>
                       </span>
                     ))}
                   </div>

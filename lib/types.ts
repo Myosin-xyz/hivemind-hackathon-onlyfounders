@@ -184,7 +184,13 @@ export type RawSignal = {
 export type TrendBrief = {
   topic: string;
   generated_at: string;
-  sources_used: TrendSource[];
+  sources_used: TrendSource[];                 // sources that returned >0 signals
+  sources_attempted?: TrendSource[];           // sources we tried to hit
+  sources_skipped?: Array<{                    // enabled but bailed pre-fetch (no env, no input)
+    source: TrendSource;
+    reason: string;
+  }>;
+  per_source_counts?: Record<string, number>;  // attempted sources → count returned
   raw_count: number;
   signals: RawSignal[];      // top N sorted by engagement
   brief: string;             // synthesized markdown
